@@ -39,3 +39,12 @@ GoogleService-Info.plist
 *firebase-adminsdk*.json
 .DS_Store
 Thumbs.db
+
+# server state files (mini PC only)
+local-dev/server/deployed.txt
+local-dev/server/changed.txt
+local-dev/server/updating.lock
+local-dev/server/building.flag
+local-dev/server/apache-test.txt
+local-dev/server/code.txt
+local-dev/server/setup-log.txt
