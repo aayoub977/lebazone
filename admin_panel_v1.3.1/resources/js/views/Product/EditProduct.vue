@@ -2687,7 +2687,7 @@ export default {
                     this.showError(__('please_select_child_category')); return false;
                 }
                 if (this.categoryAttributes.length === 0) {
-                    this.showError(__('selected_category_has_no_attributes_add_first')); return false;
+                    this.showError('Add at least one attribute for this product (e.g. Color) in the "Add an attribute to this product" box below.'); return false;
                 }
                 return true;
             }

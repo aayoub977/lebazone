@@ -109,7 +109,7 @@
                                 </div>
                             </div>
 
-                            <label class="d-block">{{ __('select_attributes') }}</label>
+                            <label class="d-block">{{ __('select_attributes') }} <span class="text-muted small fw-normal">(optional - you can also add attributes on each product)</span></label>
                             <div class="row attribute-pick-grid">
                                 <div v-for="attr in selectableAttributes" :key="'sel-' + attr.id" class="col-md-4 col-sm-6 mb-1">
                                     <div class="attribute-pick-row d-flex align-items-center justify-content-between"
@@ -1056,14 +1056,7 @@ export default {
                 return false;
             }
 
-            const activeInheritedCount = (this.inheritedAttributes || [])
-                .filter(a => !this.inheritedOffAttributeIds.includes(a.id)).length;
-            const totalAttrs = (this.selectedAttributes || []).length + activeInheritedCount;
-            if (totalAttrs === 0) {
-                this.switchToDefaultLanguageTab();
-                this.showError(__('at_least_one_attribute_required'));
-                return false;
-            }
+            // Custom (Lebazone): attributes are optional - they can be picked per product instead.
 
             return true;
         },
