@@ -2353,13 +2353,19 @@ export default {
                 const src = sharedIds.length ? existingBySharedKey[sharedKey(combo)] : null;
                 if (src) return this.carryVariantData(src, combo, idClaimed);
 
-                if (seed) {
-                    const c = this.carryVariantData(seed, combo, idClaimed);
-                    if (seedUsed) {
-                        c.stock = 0;
-                        c.store_stocks = (c.store_stocks || []).map(st => ({ ...st, available: 0, reserved: 0, pricing_slabs: (st.pricing_slabs || []).map(x => ({ ...x })) }));
-                    }
+                if (seed && !seedUsed) {
                     seedUsed = true;
+                    return this.carryVariantData(seed, combo, idClaimed);
+                }
+                // Custom (Lebazone): any NEW option copies price, cost and pictures from the
+                // first existing variant (stock 0, new SKU) instead of starting empty.
+                const tpl = seed || this.variants[0];
+                if (tpl) {
+                    const c = this.carryVariantData(tpl, combo, new Set(tpl.id ? [tpl.id] : []));
+                    c.id = null;
+                    c.sku = '';
+                    c.stock = 0;
+                    c.store_stocks = (c.store_stocks || []).map(st => ({ ...st, available: 0, reserved: 0, pricing_slabs: (st.pricing_slabs || []).map(x => ({ ...x })) }));
                     return c;
                 }
 
