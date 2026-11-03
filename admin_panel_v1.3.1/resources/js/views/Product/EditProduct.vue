@@ -2332,6 +2332,12 @@ export default {
             }
 
             const idClaimed = new Set();
+            // Custom (Lebazone): a product with no attributes yet (e.g. created from Purchasing)
+            // keeps its price, cost, pictures and stock when its first attribute is added: the first
+            // option keeps the existing variant (and its Purchasing link); the other options copy
+            // price/cost/pictures with stock 0, so stock is not counted twice.
+            const seed = !sharedIds.length ? this.variants.find(v => !(v.attribute_values || []).length) : null;
+            let seedUsed = false;
 
             this.variants = combos.map(combo => {
                 const key = this.comboKey(combo);
@@ -2346,6 +2352,16 @@ export default {
 
                 const src = sharedIds.length ? existingBySharedKey[sharedKey(combo)] : null;
                 if (src) return this.carryVariantData(src, combo, idClaimed);
+
+                if (seed) {
+                    const c = this.carryVariantData(seed, combo, idClaimed);
+                    if (seedUsed) {
+                        c.stock = 0;
+                        c.store_stocks = (c.store_stocks || []).map(st => ({ ...st, available: 0, reserved: 0, pricing_slabs: (st.pricing_slabs || []).map(x => ({ ...x })) }));
+                    }
+                    seedUsed = true;
+                    return c;
+                }
 
                 return this.blankVariant(combo);
             });
