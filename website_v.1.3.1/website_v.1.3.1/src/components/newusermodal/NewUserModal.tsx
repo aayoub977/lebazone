@@ -82,6 +82,8 @@ const NewUserModal = ({
     setCountryCode?.(country?.dial_code || "");
   };
   const [friendCode, setFriendCode] = useState<string | null>(null);
+  // Custom (Lebazone): friend code only when Refer & Earn is set up for the country.
+  const [isReferralOn, setIsReferralOn] = useState(false);
 
   // NOTE: do NOT clear phoneNumberWithoutCountryCode here. For phone-auth
   // signups the number was already verified via OTP and must stay autofilled
@@ -329,6 +331,10 @@ const NewUserModal = ({
                 value={selectedCountryId}
                 onChange={handleCountrySelect}
                 onReady={handleCountrySelect}
+                onReferralStatus={(on) => {
+                  setIsReferralOn(on);
+                  if (!on) setFriendCode(null);
+                }}
               />
             </div>
             <div className="flex flex-col gap-1">
@@ -348,6 +354,7 @@ const NewUserModal = ({
                 <span className="text-xs text-red-500">{phoneLengthError}</span>
               )}
             </div>
+            {isReferralOn && (
             <div className="flex flex-col gap-1">
               <span className="font-bold text-base">{t("friend_code")}</span>
               <input
@@ -359,6 +366,7 @@ const NewUserModal = ({
                 onChange={handleFriendCodeChange}
               />
             </div>
+            )}
             <button
               className="bg-[#29363F] py-2 my-2 px-4 cursor-pointer text-white text-center rounded-sm text-xl font-normal disabled:opacity-60 disabled:cursor-not-allowed"
               onClick={handleUserRegister}

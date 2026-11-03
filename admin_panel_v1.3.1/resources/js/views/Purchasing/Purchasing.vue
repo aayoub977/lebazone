@@ -50,10 +50,19 @@
                     <p class="text-muted">Add an item with its box or item size, quantity and price per piece. Freight, delivery and the cost of each piece are worked out for you.</p>
                     <button class="btn btn-primary" @click="openItem(null)">+ Add first item</button>
                 </div>
-                <div v-else class="list-surface">
+                <div v-if="items.length && selCount" class="pur-bulk d-flex flex-wrap align-items-center gap-2 mb-2">
+                    <b>{{ selCount }} selected</b>
+                    <button class="btn btn-sm btn-link p-0" @click="selectAll(true)" v-if="!allSelected">Select all {{ list.length }} shown</button>
+                    <button class="btn btn-sm btn-link p-0" @click="clearSel">Clear selection</button>
+                    <button class="btn btn-sm ms-auto" :class="bulkArmed ? 'btn-danger' : 'btn-outline-danger'" :disabled="busy.bulk" @click="deleteSelected">
+                        {{ busy.bulk ? 'Deleting…' : bulkArmed ? `Click again to delete ${selCount} item(s)` : `Delete ${selCount} selected` }}
+                    </button>
+                </div>
+                <div v-else-if="items.length" class="small text-muted mb-2">Tip: tick the boxes to delete several items at once.</div>
+                <div v-if="items.length" class="list-surface">
                     <table class="table align-middle mb-0 pur-table">
                         <thead><tr>
-                            <th>Item</th><th>Packing</th><th class="text-end">Goods</th><th class="text-end">Freight</th><th class="text-end">Delivery</th>
+                            <th><label class="d-inline-flex align-items-center gap-2 mb-0" title="Select every item shown"><input type="checkbox" class="form-check-input mt-0" :checked="allSelected" :indeterminate.prop="someSelected && !allSelected" @change="selectAll($event.target.checked)"> Item</label></th><th>Packing</th><th class="text-end">Goods</th><th class="text-end">Freight</th><th class="text-end">Delivery</th>
                             <th class="text-end">Total</th><th class="text-end">Cost / piece</th><th>Lebazone</th>
                         </tr></thead>
                         <tbody v-for="g in groups" :key="g.key">
@@ -76,6 +85,7 @@
                                 <tr v-for="it in g.rows" :key="it.id" @click="openItem(it)" class="pur-row">
                                     <td class="c-item" data-label="Item">
                                         <div class="d-flex align-items-center gap-3">
+                                            <input type="checkbox" class="form-check-input mt-0 flex-shrink-0 pur-check" :checked="!!sel[it.id]" @click.stop @change="toggleSel(it.id, $event.target.checked)" title="Select">
                                             <div class="pur-pic" :class="{ has: it.picture_url, over: dropId === it.id }" @click.stop="it.picture_url ? zoom(it.picture_url) : openItem(it)"
                                                 @dragover.prevent="dropId = it.id" @dragleave="dropId = null" @drop.prevent="dropPicture(it, $event)" title="Drop a photo here">
                                                 <img v-if="it.picture_url" :src="it.picture_url" alt="" loading="lazy"><span v-else>Drop<br>photo</span>
@@ -287,9 +297,12 @@ export default {
         try { grouped = localStorage.getItem('pur-grouped') !== '0'; } catch (e) {}
         return { ITEM_STATUS, COUNTRIES, grouped, closed: {}, openSup: null, panel: null, loaded: false, settings: {}, items: [], suppliers: [], shipments: [], rates: [], stores: [], learned: null, allocation: {},
             f: { q: '', sup: '', ship: '', status: '', origin: '', link: '', sort: 'new' }, rateInput: '', sForm: {},
-            itemOpen: null, form: null, armed: false, dropId: null, uploading: null, zoomSrc: null, busy: { export: false, form: false } };
+            itemOpen: null, form: null, armed: false, sel: {}, bulkArmed: false, dropId: null, uploading: null, zoomSrc: null, busy: { export: false, form: false, bulk: false } };
     },
     computed: {
+        selCount() { return Object.keys(this.sel).length; },
+        allSelected() { return this.list.length > 0 && this.list.every(i => this.sel[i.id]); },
+        someSelected() { return this.list.some(i => this.sel[i.id]); },
         filtered() { const f = this.f; return !!(f.q.trim() || f.sup || f.ship || f.status || f.origin || f.link); },
         /** Items grouped under their shipment (empty shipments shown when no filter is on), then the ones with no shipment. */
         groups() {
@@ -357,6 +370,15 @@ export default {
     },
     created() { this.load(); },
     methods: {
+        toggleSel(id, on) { const s = { ...this.sel }; if (on) s[id] = true; else delete s[id]; this.sel = s; this.bulkArmed = false; },
+        selectAll(on) { const s = { ...this.sel }; for (const i of this.list) { if (on) s[i.id] = true; else delete s[i.id]; } this.sel = s; this.bulkArmed = false; },
+        clearSel() { this.sel = {}; this.bulkArmed = false; },
+        deleteSelected() {
+            if (!this.bulkArmed) { this.bulkArmed = true; setTimeout(() => { this.bulkArmed = false; }, 4000); return; }
+            const ids = Object.keys(this.sel).map(Number);
+            this.busy.bulk = true;
+            post(this, '/purchasing/items/delete', { ids }).then(ok => { this.busy.bulk = false; this.bulkArmed = false; if (ok) { this.sel = {}; this.load(); } });
+        },
         fmt, statusClass,
         money(v, d = 2) { return v == null ? '—' : (this.settings.currency ? this.settings.currency + ' ' : '') + fmt(v, d); },
         dims(a, b, c) { return [a, b, c].every(x => num(x) != null) ? `${fmt(num(a), 0)} × ${fmt(num(b), 0)} × ${fmt(num(c), 0)} cm` : ''; },
@@ -386,6 +408,7 @@ export default {
             return axios.get(this.$apiUrl + '/purchasing/data').then(r => {
                 if (r.data.status !== 1) { this.showError(r.data.message); return; }
                 const d = r.data.data;
+                const live = new Set(d.items.map(i => i.id)); this.sel = Object.fromEntries(Object.keys(this.sel).filter(id => live.has(Number(id))).map(id => [id, true]));
                 Object.assign(this, { settings: d.settings, items: d.items, suppliers: d.suppliers, shipments: d.shipments, rates: d.rates, stores: d.stores, learned: d.learned, allocation: d.allocation });
                 this.rateInput = d.settings.cbm_price;
                 this.sForm = { ...d.settings };
@@ -460,6 +483,8 @@ export default {
 .pur-stat.hl .v { color: var(--bs-emphasis-color); }
 .pur-table th { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--bs-secondary-color); white-space: nowrap; }
 .pur-row { cursor: pointer; }
+.pur-check { width: 1.15em; height: 1.15em; cursor: pointer; }
+.pur-bulk { background: var(--bs-danger-bg-subtle); border: 1px solid var(--bs-danger-border-subtle); border-radius: 8px; padding: 8px 12px; }
 .pur-table td.c-item { width: 34%; }
 .pur-pic { flex: none; width: 96px; height: 96px; border-radius: 10px; border: 1px dashed var(--bs-border-color); background: var(--bs-tertiary-bg); display: grid; place-items: center; overflow: hidden; position: relative;
     color: var(--bs-secondary-color); font-size: 11px; text-align: center; line-height: 1.2; }

@@ -114,9 +114,10 @@ class CountryApiController extends Controller
                 'logo_url'          => $c->logo_url,
                 'date_format'       => $c->date_format ?: 'd-m-Y',
                 'time_format'       => $c->time_format ?: 'h:i A',
+                // Custom (Lebazone): on only when a reward amount is set (a minimum
+                // order amount alone does not switch the friend-code box on).
                 'is_referal_on'     => (
-                    (float) $c->referral_min_order_amount > 0
-                    || (float) $c->referral_credit_first_order > 0
+                    (float) $c->referral_credit_first_order > 0
                     || (float) $c->referral_credit_referred > 0
                 ) ? 1 : 0,
             ]);

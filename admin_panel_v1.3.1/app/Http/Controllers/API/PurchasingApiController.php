@@ -211,8 +211,11 @@ class PurchasingApiController extends Controller
     public function itemDelete(Request $request)
     {
         if ($e = $this->denied()) return $e;
-        DB::table('pur_items')->where('id', (int) $request->input('id'))->delete();
-        return CommonHelper::responseSuccess('Item deleted');
+        // Custom (Lebazone): one item (id) or many at once (ids[]).
+        $ids = array_values(array_filter(array_map('intval', (array) ($request->input('ids') ?: [$request->input('id')]))));
+        if (!$ids) return CommonHelper::responseError('Nothing selected');
+        $n = DB::table('pur_items')->whereIn('id', $ids)->delete();
+        return CommonHelper::responseSuccess($n === 1 ? 'Item deleted' : "$n items deleted");
     }
 
     /** Save an uploaded image (resized to max 1200 px when GD is available) under storage/app/public/purchasing. */
