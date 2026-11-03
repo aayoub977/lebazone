@@ -18,6 +18,10 @@ echo ==== 1/4  PHP code cache ====
 powershell -NoProfile -ExecutionPolicy Bypass -File "%SRV%fix-php.ps1" -PhpExe "%PHP%" || goto :fail
 "%PHP%" -r "exit(function_exists('opcache_get_status') ? 0 : 1);" >nul 2>&1 && echo  OPcache: on || echo  ! OPcache could not be switched on - the shop still works, just slower.
 
+pushd "%ADMIN%"
+"%PHP%" artisan config:cache >nul 2>&1 && echo  Settings cached ^(needed for Apache^) || echo  ! config:cache failed
+popd
+
 echo ==== 2/4  Apache for the admin / API ====
 if not defined HTTPD ( echo  Laragon's Apache was not found ^(C:\laragon\bin\apache^). & goto :fail )
 if not exist "C:\laragon\etc\apache2\sites-enabled" ( echo  Laragon's Apache folder C:\laragon\etc\apache2\sites-enabled is missing. & goto :fail )

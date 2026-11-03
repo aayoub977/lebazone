@@ -61,6 +61,9 @@ for %%S in (setup_lebanon.php set_branding.php enable_arabic.php) do (
 )
 for %%S in ("%LD%\setup_*.feature.php") do ( "%PHP%" "%%S" >> "%LOG%" 2>&1 || ( call :log "WARNING: %%~nxS failed" & set "WARN=1" ) )
 "%PHP%" artisan optimize:clear >> "%LOG%" 2>&1
+rem Apache on Windows runs PHP in threads, and reading .env per request there randomly
+rem loses settings (database "snapbuy", blue theme). A cached config never reads .env.
+"%PHP%" artisan config:cache >> "%LOG%" 2>&1 || call :log "WARNING: config:cache failed"
 "%PHP%" artisan queue:restart >> "%LOG%" 2>&1
 if defined ADMIN_JS (
   call :log "- admin screens rebuild (2-4 min)"

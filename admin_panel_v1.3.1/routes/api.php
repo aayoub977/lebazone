@@ -73,7 +73,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Broadcast;
 use Illuminate\Support\Facades\Route;
 
-const EDIT_ID = 'edit/{id}';
+// Custom (Lebazone): guarded - 'artisan config:cache' loads this file twice in one run.
+if (!defined('EDIT_ID')) define('EDIT_ID', 'edit/{id}');
 
 Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();
