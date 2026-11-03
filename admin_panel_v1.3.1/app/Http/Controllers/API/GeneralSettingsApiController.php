@@ -172,14 +172,15 @@ class GeneralSettingsApiController extends Controller
     public function save_login_setting(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'at_least_one' => 'At least one of phone login or google login must be enabled.',
+            'at_least_one' => 'At least one of phone, email or google login must be enabled.',
         ]);
 
         $validator->after(function ($validator) use ($request) {
             // Validate that at least one of phone_login or google_login is enabled
-            if (!$request->phone_login && !$request->google_login) {
-                $validator->errors()->add('phone_login', 'At least one of phone login or google login must be enabled.');
-                $validator->errors()->add('google_login', 'At least one of phone login or google login must be enabled.');
+            // Custom (Lebazone): email-only sign-up is allowed too.
+            if (!$request->phone_login && !$request->google_login && !$request->email_login) {
+                $validator->errors()->add('phone_login', 'At least one of phone, email or google login must be enabled.');
+                $validator->errors()->add('google_login', 'At least one of phone, email or google login must be enabled.');
             }
 
             // Additional validation if phone_login is enabled

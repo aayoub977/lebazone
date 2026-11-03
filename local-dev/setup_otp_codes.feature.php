@@ -1,4 +1,7 @@
 <?php
+// RETIRED (Lebazone): sign-up is email-only for now - see setup_email_only_login.feature.php.
+// This used to switch phone login + OTP test mode back on after every update.
+return;
 // Local-dev (Hader): sign-up / login codes go through Hader's own gateway
 // (WhatsApp first, SMS fallback) instead of Firebase. Until the WhatsApp/SMS
 // keys are entered, "test mode" writes each code to
