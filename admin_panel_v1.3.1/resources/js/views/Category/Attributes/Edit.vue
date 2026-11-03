@@ -205,8 +205,8 @@ export default {
         this.defaultValueIds = [];
       }
     },
-    showModal() { this.$refs['my-modal'].show(); },
-    hideModal() { this.$refs['my-modal'].hide(); },
+    showModal() { const m = this.$refs['my-modal']; if (m) m.show(); },
+    hideModal() { const m = this.$refs['my-modal']; if (m) m.hide(); },
     initializeForm() {
       this.languages.forEach(l => {
         if (!this.form[l.id]) this.form[l.id] = { name: '', values: [] };
@@ -354,12 +354,14 @@ export default {
 
       sequential().then(async (attrId) => {
         const msg = isUpdate ? __('attribute_updated_successfully') : __('attribute_saved_successfully');
+        // Mark clean first so closing after save doesn't trip the unsaved-changes guard.
+        try { this.captureFormBaseline(); } catch (e) { /* ignore */ }
+        this.hideModal();
+        // Custom (Lebazone): the parent usually closes this box on "saved" - nothing after
+        // this point may raise an error over a save that already worked.
         this.$emit('saved', msg, attrId);
         this.id = attrId;
-        await this.loadWithTranslations();
-        // Mark clean so closing after save doesn't trip the unsaved-changes guard.
-        this.captureFormBaseline();
-        this.hideModal();
+        try { await this.loadWithTranslations(); this.captureFormBaseline(); } catch (e) { /* box already closed */ }
       }).catch(e => {
         this.showError((e && e.response && e.response.data && e.response.data.message) || (e && e.message) || 'Could not save the attribute');
       }).finally(() => { this.isLoading = false; });

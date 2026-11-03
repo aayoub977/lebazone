@@ -215,7 +215,18 @@ class AttributeApiController extends Controller
             $attribute->saveTranslation($request->language_id, ['name' => $request->name]);
 
             if ($request->has('values')) {
+                $langId = (int) $request->language_id;
+                $before = $this->valueTexts($attribute, $langId, $isDefaultLang);
                 $this->syncValues($attribute, $request->input('values', []), $request->language_id);
+                $after = $this->valueTexts($attribute, $langId, $isDefaultLang);
+                // Custom (Lebazone): a renamed value is renamed in the variant names too
+                // ("Gold / Large" -> "Golden / Large"), so the shop shows the new word.
+                foreach ($before as $valueId => $oldText) {
+                    $newText = $after[$valueId] ?? null;
+                    if ($newText !== null && $oldText !== '' && $newText !== '' && $newText !== $oldText) {
+                        $this->renameInVariantNames((int) $valueId, $langId, $isDefaultLang, $oldText, $newText);
+                    }
+                }
             }
 
             return CommonHelper::responseSuccess('attribute_updated_successfully');
@@ -236,6 +247,45 @@ class AttributeApiController extends Controller
         }
         $attribute->delete();
         return CommonHelper::responseSuccess('attribute_deleted_successfully');
+    }
+
+    /** [value_id => text] for one language (default language: the value column). */
+    protected function valueTexts(Attribute $attribute, int $langId, bool $isDefaultLang): array
+    {
+        $ids = AttributeValue::where('attribute_id', $attribute->id)->pluck('value', 'id')->all();
+        if ($isDefaultLang) return array_map(fn ($v) => trim((string) $v), $ids);
+        $tr = DB::table('attribute_value_translations')->whereIn('attribute_value_id', array_keys($ids))
+            ->where('language_id', $langId)->pluck('value', 'attribute_value_id')->all();
+        return array_map(fn ($v) => trim((string) $v), $tr);
+    }
+
+    /** Replace the "old" segment of "A / B" variant names with the new text, for variants using this value. */
+    protected function renameInVariantNames(int $valueId, int $langId, bool $isDefaultLang, string $old, string $new): void
+    {
+        $variantIds = DB::table('product_variant_attribute_values')->where('attribute_value_id', $valueId)
+            ->pluck('product_variant_id')->unique()->all();
+        if (!$variantIds) return;
+        $swap = function ($name) use ($old, $new) {
+            $parts = array_map('trim', explode(' / ', (string) $name));
+            $changed = false;
+            foreach ($parts as $i => $p) {
+                if (mb_strtolower($p) === mb_strtolower($old)) { $parts[$i] = $new; $changed = true; }
+            }
+            return $changed ? implode(' / ', $parts) : null;
+        };
+        foreach (DB::table('product_variant_translations')->whereIn('product_variant_id', $variantIds)
+                     ->where('language_id', $langId)->get(['id', 'name']) as $row) {
+            if (($n = $swap($row->name)) !== null) {
+                DB::table('product_variant_translations')->where('id', $row->id)->update(['name' => $n]);
+            }
+        }
+        if ($isDefaultLang && \Illuminate\Support\Facades\Schema::hasColumn('product_variants', 'name')) {
+            foreach (DB::table('product_variants')->whereIn('id', $variantIds)->get(['id', 'name']) as $row) {
+                if (($n = $swap($row->name)) !== null) {
+                    DB::table('product_variants')->where('id', $row->id)->update(['name' => $n]);
+                }
+            }
+        }
     }
 
     /**
