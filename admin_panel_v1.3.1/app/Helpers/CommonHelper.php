@@ -3756,6 +3756,24 @@ class CommonHelper
         return array("order" => $order, "order_items" => $order_items);
     }
 
+    /** Custom (Lebazone): the order's invoice saved as a temporary PDF (for email), or null. */
+    public static function invoicePdfFile($orderId, string $number): ?string
+    {
+        try {
+            $res = self::downloadOrderInvoice($orderId);
+            $pdf = method_exists($res, 'getContent') ? (string) $res->getContent() : '';
+            if (strncmp($pdf, '%PDF', 4) !== 0) return null;
+            $dir = storage_path('app/tmp-invoices');
+            if (!is_dir($dir)) @mkdir($dir, 0775, true);
+            $path = $dir . '/Invoice-' . (preg_replace('/[^A-Za-z0-9_-]/', '', $number) ?: $orderId) . '.pdf';
+            file_put_contents($path, $pdf);
+            return $path;
+        } catch (\Throwable $e) {
+            Log::warning('[Mail] invoice PDF for order ' . $orderId . ' failed: ' . $e->getMessage());
+            return null;
+        }
+    }
+
     public static function downloadOrderInvoice($order_id, ?string $size = null)
     {
         // Include cancelled/returned items so the invoice can show them (refunded) too.
@@ -4352,7 +4370,7 @@ class CommonHelper
      * Send a template-driven email in the recipient's language (users.language_id).
      * Global placeholders app_name / support_email / support_number are merged in.
      */
-    public static function sendMailByTemplate($to, string $templateType, array $placeholders = [], ?int $languageId = null): void
+    public static function sendMailByTemplate($to, string $templateType, array $placeholders = [], ?int $languageId = null, ?string $attachment = null): void
     {
         $languageId = $languageId ?: self::getDefaultLanguageId();
 
@@ -4393,6 +4411,7 @@ class CommonHelper
             'content_html' => $contentHtml,
             'name'         => $placeholders['customer_name'] ?? ($placeholders['delivery_boy_name'] ?? ''),
         ];
+        if ($attachment) $data['attachment'] = $attachment; // Custom (Lebazone): e.g. the invoice PDF
 
         self::sendMail($to, $subject, $data);
     }
@@ -4639,7 +4658,14 @@ class CommonHelper
 
                     $placeholders['order_items_html'] = self::orderItemsTableHtml($mail_order, $currency);
                 }
-                self::sendMailByTemplate($customer->email, $template, $placeholders, $langId);
+                // Custom (Lebazone): the order-confirmation email carries the invoice PDF.
+                $invoiceFile = null;
+                if (!$order_item && $status_id === (int) OrderStatusList::$received
+                    && (string) Setting::get_value('invoice_in_order_mail') !== '0') {
+                    $invoiceFile = self::invoicePdfFile($mail_order->id, (string) $order_id);
+                }
+                self::sendMailByTemplate($customer->email, $template, $placeholders, $langId, $invoiceFile);
+                if ($invoiceFile) @unlink($invoiceFile);
             }
         }
 
