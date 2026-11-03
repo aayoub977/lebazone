@@ -82,7 +82,10 @@ class OrderApiController extends Controller
             }
 
             // Order only this channel's cart lines (plus legacy NULL-channel rows).
-            $cartItems = Cart::select('carts.*', 'product_variants.name as product_name', 'products.sales_channel', 'products.product_type', 'products.is_prescription_required', 'stores.name as store_name')
+            $cartItems = Cart::select('carts.*', DB::raw("TRIM(CASE WHEN COALESCE(products.name, '') = '' THEN product_variants.name "
+                . "WHEN COALESCE(product_variants.name, '') = '' OR product_variants.name = products.name THEN products.name "
+                . "ELSE CONCAT(products.name, ' - ', product_variants.name) END) as product_name"), // Custom (Lebazone): 'Ramadan Lantern - Gold', not just 'Gold'
+                'products.sales_channel', 'products.product_type', 'products.is_prescription_required', 'stores.name as store_name')
                 ->join('products', 'carts.product_id', '=', 'products.id')
                 ->join('product_variants', 'carts.product_variant_id', '=', 'product_variants.id')
                 ->leftJoin('stores', 'carts.store_id', '=', 'stores.id')

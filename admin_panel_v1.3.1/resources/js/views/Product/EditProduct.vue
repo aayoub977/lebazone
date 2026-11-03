@@ -2370,6 +2370,9 @@ export default {
                     c.id = null;
                     c.sku = '';
                     c.stock = 0;
+                    // Pictures are NOT copied - a Gold option must not show the Red one's photo.
+                    Object.assign(c, { image_file: null, image_preview: null, image_url: null, image_path: null,
+                        gallery_files: [], gallery_previews: [], gallery_keep: [], gallery_media: [], gallery_delete_ids: [] });
                     c.store_stocks = (c.store_stocks || []).map(st => ({ ...st, available: 0, reserved: 0, pricing_slabs: (st.pricing_slabs || []).map(x => ({ ...x })) }));
                     return c;
                 }
