@@ -1846,7 +1846,7 @@ class OrderApiController extends Controller
                 'v.id as variant_id',
                 'p.id as product_id',
                 'v.name',
-                'p.image',
+                DB::raw("COALESCE(NULLIF(v.image, ''), p.image) as image"), // Custom (Lebazone): option picture
                 'p.manufacturer',
                 'p.made_in',
                 's.name as store_name',
@@ -2002,7 +2002,7 @@ class OrderApiController extends Controller
             'o.delivery_charge as order_delivery_charge',
             'o.country_id as order_country_id',
             'o.cashback_amount', 'o.cashback_credited', 'o.saved_amount',
-            'v.id as variant_id', 'v.name', 'p.id as product_id', 'p.image',
+            'v.id as variant_id', 'v.name', 'p.id as product_id', DB::raw("COALESCE(NULLIF(v.image, ''), p.image) as image"),
             's.name as store_name',
             'db.name as delivery_boy_name', 'db.mobile as delivery_boy_mobile',
             DB::raw('(SELECT status FROM return_requests WHERE order_item_id = oi.id) as return_requested'),
@@ -2032,7 +2032,7 @@ class OrderApiController extends Controller
             ->whereIn('oi.order_id', $orderIds)
             ->orderBy('oi.id', 'ASC')
             ->get(['oi.id', 'oi.order_id', 'oi.product_name', 'oi.quantity', 'oi.active_status',
-                'oi.final_total', 'oi.wallet_balance', 'p.image'])
+                'oi.final_total', 'oi.wallet_balance', DB::raw("COALESCE(NULLIF(v.image, ''), p.image) as image")])
             ->groupBy('order_id');
 
         // Return-request status per sibling item (for other_items' order_item_status).

@@ -3329,7 +3329,7 @@ class CommonHelper
             'products.id as product_id',
             'products.return_status',
             'products.return_days',
-            DB::raw('CONCAT("' . asset('storage/') . '", "/", products.image) as image'),
+            DB::raw('CONCAT("' . asset('storage/') . '", "/", COALESCE(NULLIF(product_variants.image, ""), products.image)) as image'), // Custom (Lebazone): the ordered option's own picture
             'os.id as active_status',
             'os.status as status_name'
         )
@@ -3540,7 +3540,7 @@ class CommonHelper
             'products.id as product_id',
             'order_items.return_status',
             'order_items.return_days',
-            DB::raw('CONCAT("' . asset('storage/') . '", "/", products.image) as image'),
+            DB::raw('CONCAT("' . asset('storage/') . '", "/", COALESCE(NULLIF(product_variants.image, ""), products.image)) as image'), // Custom (Lebazone): the ordered option's own picture
             // Rows hydrate as Order models here, so OrderItem's prescription_url accessor
             // never fires — build the URL in SQL like image above.
             DB::raw('CASE WHEN order_items.prescription IS NULL OR order_items.prescription = "" THEN "" ELSE CONCAT("' . asset('storage/') . '", "/", order_items.prescription) END as prescription_url'),
@@ -4724,7 +4724,7 @@ class CommonHelper
                 'order_items.price',
                 'order_items.discounted_price',
                 'order_items.sub_total',
-                'products.image as product_image',
+                DB::raw('COALESCE(NULLIF(product_variants.image, ""), products.image) as product_image'),
             ]);
         if ($items->isEmpty()) {
             return '';
@@ -4931,7 +4931,7 @@ class CommonHelper
             $productImage = DB::table('product_variants')
                 ->join('products', 'products.id', '=', 'product_variants.product_id')
                 ->where('product_variants.id', $orderItem->product_variant_id)
-                ->value('products.image');
+                ->value(DB::raw('COALESCE(NULLIF(product_variants.image, ""), products.image)'));
             if ($productImage) {
                 $itemImage = asset('storage/' . $productImage);
             }
