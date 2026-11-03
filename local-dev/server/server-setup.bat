@@ -34,7 +34,7 @@ w32tm /resync /force >nul 2>&1
 echo  Date and time on this PC now: %DATE% %TIME%
 echo  ^(If this is not today's date, fix it in Settings ^> Time ^& language, then run this again.^)
 powershell -NoProfile -ExecutionPolicy Bypass -File "%SRV%fix-php.ps1" -PhpExe "%PHP%" || goto :fail
-"%PHP%" -m | findstr /i /x "zip" >nul || ( echo  PHP zip extension is still off - in Laragon: Menu ^> PHP ^> Extensions ^> tick zip. & goto :fail )
+"%PHP%" -r "exit(extension_loaded('zip') ? 0 : 1);" >nul 2>&1 || ( echo  PHP zip extension is still off - in Laragon: Menu ^> PHP ^> Extensions ^> tick zip. & goto :fail )
 echo  OK
 
 echo ==== 1/7  Settings, photos, tunnel ====
