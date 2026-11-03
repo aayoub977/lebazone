@@ -25,6 +25,18 @@ where composer >nul 2>&1 || ( echo  Composer not found ^(it comes with Laragon: 
 if not exist "%PKG%\lebazone.sql" ( echo  The move package is missing - copy it to %PKG% first. & goto :fail )
 echo  OK
 
+echo ==== Clock and PHP extensions ====
+rem A wrong clock breaks every secure download ("certificate is not yet valid").
+sc config w32time start= auto >nul 2>&1
+net start w32time >nul 2>&1
+w32tm /config /manualpeerlist:"time.windows.com time.google.com" /syncfromflags:manual /reliable:yes /update >nul 2>&1
+w32tm /resync /force >nul 2>&1
+echo  Date and time on this PC now: %DATE% %TIME%
+echo  ^(If this is not today's date, fix it in Settings ^> Time ^& language, then run this again.^)
+powershell -NoProfile -ExecutionPolicy Bypass -File "%SRV%fix-php.ps1" -PhpExe "%PHP%" || goto :fail
+"%PHP%" -m | findstr /i /x "zip" >nul || ( echo  PHP zip extension is still off - in Laragon: Menu ^> PHP ^> Extensions ^> tick zip. & goto :fail )
+echo  OK
+
 echo ==== 1/7  Settings, photos, tunnel ====
 copy /y "%PKG%\admin.env" "%ADMIN%\.env" >nul || goto :fail
 copy /y "%PKG%\website.env" "%WEB%\.env" >nul || goto :fail
@@ -55,7 +67,7 @@ echo  database !DBN! imported.
 
 echo ==== 3/7  Admin panel packages (a few minutes) ====
 cd /d "%ADMIN%"
-call composer install --no-interaction >> "%LOG%" 2>&1 || goto :fail
+call composer install --no-interaction >> "%LOG%" 2>&1 || ( echo  composer install failed - see %LOG% & goto :fail )
 "%PHP%" artisan storage:link --force >> "%LOG%" 2>&1
 "%PHP%" artisan migrate --force >> "%LOG%" 2>&1 || goto :fail
 "%PHP%" artisan optimize:clear >> "%LOG%" 2>&1
