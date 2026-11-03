@@ -609,10 +609,14 @@
                                         <template v-if="currentVariantLang.id === defaultLanguageId">
                                             <div class="col-md-3">
                                                 <div class="form-group required">
-                                                    <label>{{ __('sku') }} <i class="text-danger">*</i></label>
-                                                    <input type="text" class="form-control"
-                                                        :class="{ 'is-invalid': v.skuError }"
-                                                        v-model="v.sku" @input="onSkuInput(v)" />
+                                                    <label>{{ __('sku') }} <i class="text-danger">*</i> <span class="text-muted small fw-normal">(made automatically)</span></label>
+                                                    <div class="input-group">
+                                                        <input type="text" class="form-control"
+                                                            :class="{ 'is-invalid': v.skuError }"
+                                                            v-model="v.sku" @input="onSkuInput(v)" />
+                                                        <button type="button" class="btn btn-outline-secondary" title="Make a new SKU"
+                                                            @click="v.sku = ''; v.sku = autoSku(v, vIdx); onSkuInput(v)">↻</button>
+                                                    </div>
                                                     <small v-if="v.skuError" class="text-danger d-block mt-1">{{ v.skuError }}</small>
                                                 </div>
                                             </div>
@@ -1484,6 +1488,7 @@ export default {
         },
         czOnFilter() { this.fetchChannelStores(); },
         bootstrap() {
+            this._skuBase = null; // Custom (Lebazone): new random SKU code per product
             this.isLoadingData = true;
             Promise.all([
                 this.fetchActiveLanguages(),
@@ -2370,6 +2375,57 @@ export default {
                 }
 
                 return this.blankVariant(combo);
+            });
+            this.fillMissingSkus();
+        },
+
+        // Custom (Lebazone): SKUs are made automatically - a random product code shared by
+        // all its variants + a short code per option, e.g. LBZ-K7M2QX-GLD-L. Still editable.
+        skuBase() {
+            if (!this._skuBase) {
+                const found = (this.variants || []).map(v => (v.sku || '').trim()).find(x => /^LBZ-[A-Z0-9]{6}(-|$)/.test(x));
+                if (found) {
+                    this._skuBase = found.slice(0, 10);
+                } else {
+                    const A = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+                    let r = '';
+                    for (let i = 0; i < 6; i++) r += A[Math.floor(Math.random() * A.length)];
+                    this._skuBase = 'LBZ-' + r;
+                }
+            }
+            return this._skuBase;
+        },
+        skuOptionCode(label) {
+            const MAP = { 'gold': 'GLD', 'silver': 'SLV', 'black': 'BLK', 'white': 'WHT', 'red': 'RED', 'blue': 'BLU',
+                'green': 'GRN', 'yellow': 'YEL', 'pink': 'PNK', 'purple': 'PUR', 'orange': 'ORG', 'brown': 'BRN',
+                'grey': 'GRY', 'gray': 'GRY', 'beige': 'BEG', 'bronze': 'BRZ', 'rose gold': 'RGD', 'navy': 'NVY',
+                'multicolor': 'MLT', 'multicolour': 'MLT', 'multi color': 'MLT', 'transparent': 'CLR', 'clear': 'CLR',
+                'warm white': 'WW', 'cool white': 'CW', 'rgb': 'RGB', 'small': 'S', 'medium': 'M', 'large': 'L',
+                'x-large': 'XL', 'extra large': 'XL', 'xl': 'XL', 'xxl': 'XXL', 'xs': 'XS' };
+            const key = String(label || '').trim().toLowerCase();
+            if (MAP[key]) return MAP[key];
+            const s = key.normalize('NFD').toUpperCase().replace(/[^A-Z0-9]/g, '');
+            if (!s) return '';
+            return /\d/.test(s) ? s.slice(0, 5) : s.slice(0, 3);
+        },
+        autoSku(v, idx) {
+            const codes = (v.attribute_values || []).slice().sort((a, b) => a.attribute_id - b.attribute_id).map(c => {
+                const attr = (this.categoryAttributes || []).find(a => a.id === c.attribute_id);
+                const val = attr ? (attr.values || []).find(x => x.id === c.value_id) : null;
+                return val ? (this.skuOptionCode(this.valueLabel(val)) || ('V' + val.id)) : '';
+            }).filter(Boolean);
+            let sku = [this.skuBase(), ...codes].join('-');
+            const taken = new Set(this.variants.filter(o => o !== v).map(o => (o.sku || '').trim().toUpperCase()));
+            if (taken.has(sku.toUpperCase())) sku += '-' + (idx + 1);
+            return sku;
+        },
+        fillMissingSkus() {
+            this.$nextTick(() => {
+                (this.variants || []).forEach((v, i) => {
+                    if ((v.sku || '').trim()) return;
+                    v.sku = this.autoSku(v, i);
+                    this.onSkuInput(v);
+                });
             });
         },
 
