@@ -28,6 +28,9 @@ echo  database !DBN! saved.
 
 echo ==== 2/4  Photos and uploaded files ====
 robocopy "%ADMIN%\storage\app" "%PKG%\storage-app" /E /NFL /NDL /NJH /NJS /NP >nul
+rem "installed" marker + login (Passport) keys - without them the admin shows the setup wizard
+if not exist "%PKG%\storage-root" mkdir "%PKG%\storage-root"
+for %%F in (installed oauth-private.key oauth-public.key) do if exist "%ADMIN%\storage\%%F" copy /y "%ADMIN%\storage\%%F" "%PKG%\storage-root\%%F" >nul
 if errorlevel 8 goto :fail
 
 echo ==== 3/4  Settings ====

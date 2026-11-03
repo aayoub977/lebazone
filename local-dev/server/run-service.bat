@@ -22,6 +22,8 @@ goto :waitdb
 
 :loop
 echo %date% %time% start %1 >> "%LOGS%\services.log"
+rem once speed-up.bat has moved the admin to Laragon's Apache, this part just waits
+if /i "%1"=="admin" if exist "C:\laragon\etc\apache2\sites-enabled\lebazone-admin.conf" ( timeout /t 3600 /nobreak >nul & goto :loop )
 if /i "%1"=="admin" (
   cd /d "%ADMIN%"
   "%PHP%" artisan serve --host=127.0.0.1 --port=8100 >nul 2>&1

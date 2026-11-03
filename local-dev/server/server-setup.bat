@@ -42,6 +42,8 @@ copy /y "%PKG%\admin.env" "%ADMIN%\.env" >nul || goto :fail
 copy /y "%PKG%\website.env" "%WEB%\.env" >nul || goto :fail
 for %%F in (app\public framework\cache\data framework\sessions framework\views framework\testing logs) do if not exist "%ADMIN%\storage\%%F" mkdir "%ADMIN%\storage\%%F"
 robocopy "%PKG%\storage-app" "%ADMIN%\storage\app" /E /NFL /NDL /NJH /NJS /NP >nul
+if exist "%PKG%\storage-root" for %%F in ("%PKG%\storage-root\*") do copy /y "%%F" "%ADMIN%\storage\" >nul
+if not exist "%ADMIN%\storage\installed" echo installed> "%ADMIN%\storage\installed"
 if errorlevel 8 goto :fail
 if not exist "%LD%\tools" mkdir "%LD%\tools"
 copy /y "%PKG%\cloudflared.exe" "%LD%\tools\cloudflared.exe" >nul || goto :fail
