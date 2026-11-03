@@ -31,15 +31,15 @@
               <label>{{ __('status') }}</label>
               <div class="text-left mt-1">
                 <div class="btn-group btn-group-toggle" role="group">
-                  <label class="btn btn-outline-primary" :class="{ active: status == 0, disabled: attributeInUse }">
-                    <input type="radio" :value="0" v-model.number="status" autocomplete="off" :disabled="attributeInUse"> {{ __('deactivate') }}
+                  <label class="btn btn-outline-primary" :class="{ active: status == 0 }">
+                    <input type="radio" :value="0" v-model.number="status" autocomplete="off"> {{ __('deactivate') }}
                   </label>
                   <label class="btn btn-outline-primary" :class="{ active: status == 1 }">
                     <input type="radio" :value="1" v-model.number="status" autocomplete="off"> {{ __('activate') }}
                   </label>
                 </div>
                 <small v-if="attributeInUse" class="text-muted d-block mt-1">
-                  {{ __('cannot_deactivate_attribute_in_use') || 'This attribute is used by existing products and cannot be deactivated.' }}
+                  Used by products - deactivating hides it when adding new products; existing products keep it.
                 </small>
               </div>
             </div>
@@ -55,7 +55,7 @@
             <small class="text-muted">{{ __('enter_comma_separated_values') }}</small>
             <!-- Values already on product variants can be renamed but not removed. -->
             <small v-if="lang.is_default && inUseValueLabels.length" class="text-warning d-block mt-1">
-              {{ __('values_in_use_cannot_be_removed') || 'These values are used by products and cannot be removed:' }}
+              Used by products (rename freely; removing one takes it off those variants):
               <strong>{{ inUseValueLabels.join(', ') }}</strong>
             </small>
           </div>
@@ -168,7 +168,16 @@ export default {
       const parts = (this.valuesText[langId] || '').split(',').map(s => s.trim()).filter(s => s !== '');
       const existing = this.form[langId] && Array.isArray(this.form[langId].values) ? this.form[langId].values : [];
       const byText = new Map(existing.map(v => [String(v.value).trim(), v.id]));
-      return parts.map(value => ({ id: byText.has(value) ? byText.get(value) : null, value }));
+      const out = parts.map(value => ({ id: byText.has(value) ? byText.get(value) : null, value }));
+      // Custom (Lebazone): a changed word is a RENAME, not remove + add - it keeps the value
+      // (and every product using it). Unmatched new words take unmatched old values in order.
+      const used = new Set(out.map(o => o.id).filter(Boolean));
+      const freeOld = existing.filter(v => v.id && !used.has(v.id));
+      for (const o of out) {
+        if (o.id || !freeOld.length) continue;
+        o.id = freeOld.shift().id;
+      }
+      return out;
     },
     // Values payload for a language. Default owns the canonical set (blanks
     // dropped — they must not create empty values). For a non-default language
@@ -284,15 +293,9 @@ export default {
         const idx = this.languages.findIndex(l => l.id === this.defaultLanguageId);
         if (idx !== -1) this.activeTab = idx;
       };
+      // Custom (Lebazone): in-use attributes are editable - ask before removing used values.
       const removed = this.removedInUseValueLabels();
-      if (removed.length) {
-        const tpl = __('cannot_remove_values_in_use') || 'These values are used by product variants and cannot be removed: :values';
-        this.showError(tpl.replace(':values', removed.join(', ')));
-        toDefaultTab();
-        return false;
-      }
-      if (this.attributeInUse && Number(this.status) === 0) {
-        this.showError(__('cannot_deactivate_attribute_in_use') || 'This attribute is used by existing products and cannot be deactivated.');
+      if (removed.length && !window.confirm('These values are used by products: ' + removed.join(', ') + '.\n\nRemove them anyway? They will be taken off those product variants.')) {
         toDefaultTab();
         return false;
       }

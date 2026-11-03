@@ -192,10 +192,9 @@ class AttributeApiController extends Controller
                     ->whereIn('attribute_value_id', $removedIds)
                     ->distinct()->pluck('attribute_value_id')->all();
                 if ($usedIds) {
-                    $names = AttributeValue::whereIn('id', $usedIds)->pluck('value')->implode(', ');
-                    return CommonHelper::responseError(
-                        __('attribute_value_in_use_cannot_remove', ['values' => $names])
-                    );
+                    // Custom (Lebazone): allowed (the admin confirmed) - take the removed values
+                    // off the variants that used them instead of refusing the edit.
+                    DB::table('product_variant_attribute_values')->whereIn('attribute_value_id', $usedIds)->delete();
                 }
             }
         }
