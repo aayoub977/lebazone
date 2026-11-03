@@ -342,6 +342,8 @@ export default {
 
           const url = attrId ? this.$apiUrl + '/attributes/update' : this.$apiUrl + '/attributes/save';
           const res = await axios.post(url, payload);
+          // Custom (Lebazone): a refused save used to close the box as if it had worked.
+          if (res.data && res.data.status === 0) throw new Error(res.data.message || 'Could not save the attribute');
           if (!attrId && res.data.data?.id) attrId = res.data.data.id;
         }
         return attrId;
@@ -355,6 +357,8 @@ export default {
         // Mark clean so closing after save doesn't trip the unsaved-changes guard.
         this.captureFormBaseline();
         this.hideModal();
+      }).catch(e => {
+        this.showError((e && e.response && e.response.data && e.response.data.message) || (e && e.message) || 'Could not save the attribute');
       }).finally(() => { this.isLoading = false; });
     },
   },

@@ -127,7 +127,8 @@ class AttributeApiController extends Controller
             // ensure uniqueness
             $base = $slug;
             $i = 1;
-            while (Attribute::where('slug', $slug)->exists()) {
+            // Custom (Lebazone): include deleted attributes - a deleted "Color" still holds the slug "color".
+            while (Attribute::withTrashed()->where('slug', $slug)->exists()) {
                 $i++;
                 $slug = $base . '-' . $i;
             }
@@ -205,7 +206,7 @@ class AttributeApiController extends Controller
                 $attribute->status = $request->status ?? $attribute->status;
                 if ($request->filled('slug') && $request->slug !== $attribute->slug) {
                     $newSlug = $request->slug;
-                    if (!Attribute::where('slug', $newSlug)->where('id', '!=', $attribute->id)->exists()) {
+                    if (!Attribute::withTrashed()->where('slug', $newSlug)->where('id', '!=', $attribute->id)->exists()) {
                         $attribute->slug = $newSlug;
                     }
                 }
