@@ -100,11 +100,34 @@
                                                 <span v-if="(attr.values || []).length > 5">…</span>
                                             </div>
                                         </div>
+                                        <div class="d-flex gap-1 flex-shrink-0">
                                         <button type="button" class="btn btn-sm btn-outline-secondary"
                                             v-if="$can('attribute_update')" @click="openAttributeModal(attr)">
                                             <Pencil :size="15" /> {{ __('manage_values') }}
                                         </button>
+                                        <button type="button" class="btn btn-sm btn-outline-danger" v-if="isExtraAttr(attr.id)"
+                                            title="Remove from this product" @click="removeProductAttr(attr.id)"><X :size="15" /></button>
+                                        </div>
                                     </div>
+                                    <div v-if="isExtraAttr(attr.id)" class="small text-muted ms-1 mt-1">Added for this product only</div>
+                                </div>
+                            </div>
+                            <!-- Custom (Lebazone): attributes per product - pick any attribute for THIS product,
+                                 whatever its category has. -->
+                            <div class="prod-attr-add mt-3 p-3 border rounded">
+                                <div class="fw-bold mb-1">Add an attribute to this product</div>
+                                <div class="small text-muted mb-2">Pick any attribute (Color, Size, Light colour…) for this product only - it does not change the category. Make a new one if it doesn't exist yet.</div>
+                                <div class="d-flex flex-wrap gap-2 align-items-center">
+                                    <select class="form-select form-select-sm w-auto" style="min-width:220px" v-model="attrToAdd" :disabled="!availableExtraAttrs.length">
+                                        <option value="">{{ availableExtraAttrs.length ? 'Choose an attribute…' : (allAttributesLoaded ? 'All attributes are already added' : 'Loading…') }}</option>
+                                        <option v-for="a in availableExtraAttrs" :key="'aa-' + a.id" :value="String(a.id)">{{ attrLabel(a) }} ({{ (a.values || []).length }} values)</option>
+                                    </select>
+                                    <button type="button" class="btn btn-sm btn-primary" :disabled="!attrToAdd" @click="addProductAttr(attrToAdd)">
+                                        <Plus :size="15" /> Add
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-primary" v-if="$can('attribute_create')" @click="openAttributeModal(null)">
+                                        <Plus :size="15" /> New attribute
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -1120,6 +1143,12 @@ export default {
             categoryLevels: [],
             categoryLevelsLoading: false,
             categoryAttributes: [],
+            // Custom (Lebazone): attributes picked for this product on top of the category's
+            schemaAttributes: [],
+            allAttributes: [],
+            allAttributesLoaded: false,
+            extraAttrIds: [],
+            attrToAdd: '',
             categoryCustomFields: [],
             categoryCustomSections: [],
 
@@ -1169,6 +1198,10 @@ export default {
         };
     },
     computed: {
+        availableExtraAttrs() {
+            const have = new Set((this.categoryAttributes || []).map(a => a.id));
+            return (this.allAttributes || []).filter(a => !have.has(a.id));
+        },
         // Fixed option set — no search box needed.
         product_typeOptions() {
             return [
@@ -1393,6 +1426,7 @@ export default {
     },
     mounted() {
         this.$nextTick(() => this.bootstrap());
+        this.loadAllAttributes(); // Custom (Lebazone): for "Add an attribute to this product"
         if (!this.id) {
             this.autoSaveTimer = setInterval(() => this.autoSaveTick(), 20000);
         }
@@ -2109,6 +2143,9 @@ export default {
             const sel = {};
             for (const k of Object.keys(selByAttr)) sel[k] = [...selByAttr[k]];
             this.selectedValuesByAttr = sel;
+            const inSchema = new Set((this.schemaAttributes || []).map(a => a.id));
+            this.extraAttrIds = Object.keys(selByAttr).map(Number).filter(id => !inSchema.has(id));
+            if (this.extraAttrIds.length) this.loadAllAttributes().then(() => this.rebuildAttributes());
 
             this.$nextTick(() => {
                 this.variants = rows.map(v => this.hydrateVariant(v));
@@ -2196,7 +2233,8 @@ export default {
         loadCategorySchema() {
             const catId = this.effectiveCategoryId;
             if (!catId) {
-                this.categoryAttributes = [];
+                this.schemaAttributes = [];
+                this.rebuildAttributes();
                 this.categoryCustomFields = [];
                 this.categoryCustomSections = [];
                 this._schemaKey = null;
@@ -2224,7 +2262,8 @@ export default {
                     Object.freeze(s.fields || []);
                     Object.freeze(s);
                 });
-                this.categoryAttributes = Object.freeze(attrs);
+                this.schemaAttributes = Object.freeze(attrs);
+                this.rebuildAttributes();
                 this.categoryCustomSections = Object.freeze(sections);
                 this.categoryCustomFields = Object.freeze([].concat(...sections.map(s => s.fields || [])));
             }).catch(() => { });
@@ -2544,6 +2583,46 @@ export default {
             }
         },
 
+        loadAllAttributes(force = false) {
+            if (this._allAttrReq && !force) return this._allAttrReq;
+            this._allAttrReq = axios.get(this.$apiUrl + '/attributes/dropdown').then(r => {
+                const rows = (r.data && r.data.data) || [];
+                this.allAttributes = Object.freeze(rows.map(a => {
+                    const values = (a.values || a.active_values || []).map(v => Object.freeze({ ...v, translations: Object.freeze(v.translations || []) }));
+                    return Object.freeze({ ...a, translations: Object.freeze(a.translations || []), values: Object.freeze(values) });
+                }));
+                this.allAttributesLoaded = true;
+            }).catch(() => { this.allAttributesLoaded = true; });
+            return this._allAttrReq;
+        },
+        /** category attributes + the ones picked for this product (fresh values from the full list). */
+        rebuildAttributes() {
+            const base = [...(this.schemaAttributes || [])];
+            const have = new Set(base.map(a => a.id));
+            for (const id of this.extraAttrIds) {
+                if (have.has(id)) continue;
+                const a = (this.allAttributes || []).find(x => x.id === id);
+                if (a) { base.push(a); have.add(id); }
+            }
+            this.categoryAttributes = Object.freeze(base);
+        },
+        isExtraAttr(id) {
+            return this.extraAttrIds.includes(id) && !(this.schemaAttributes || []).some(a => a.id === id);
+        },
+        addProductAttr(id) {
+            id = Number(id);
+            if (!id) return;
+            if (!this.extraAttrIds.includes(id)) this.extraAttrIds.push(id);
+            this.attrToAdd = '';
+            this.rebuildAttributes();
+        },
+        removeProductAttr(id) {
+            this.extraAttrIds = this.extraAttrIds.filter(x => x !== id);
+            if (this.selectedValuesByAttr[id]) {
+                const s = { ...this.selectedValuesByAttr }; delete s[id]; this.selectedValuesByAttr = s;
+            }
+            this.rebuildAttributes();
+        },
         openAttributeModal(record) {
             this.attributeModal = record || null;
         },
@@ -2554,16 +2633,12 @@ export default {
                 this._schemaReq = null;
                 this.loadCategorySchema().then(() => this.pruneSelectedValues());
             };
-            // A newly created attribute isn't linked to any category yet — attach it
-            // to the current one so it shows up in this category's schema.
-            if (attrId && this.effectiveCategoryId) {
-                axios.post(this.$apiUrl + '/categories/attach_attribute', {
-                    category_id: this.effectiveCategoryId,
-                    attribute_id: attrId,
-                }).then(reload).catch(reload);
-            } else {
+            // Custom (Lebazone): a new attribute is added to THIS product only (the category
+            // is left alone). Values edited on any attribute are reloaded either way.
+            this.loadAllAttributes(true).then(() => {
+                if (attrId && !this.extraAttrIds.includes(Number(attrId))) this.extraAttrIds.push(Number(attrId));
                 reload();
-            }
+            });
         },
         // Remove selections pointing at values that were deleted in the editor.
         pruneSelectedValues() {
