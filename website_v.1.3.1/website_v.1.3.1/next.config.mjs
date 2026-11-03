@@ -103,6 +103,21 @@ if (process.env.NEXT_PUBLIC_SEO !== "false") {
   ];
 }
 
+// Custom (Lebazone): Google sign-in shows "to continue to lebazone.store" instead of
+// "<project>.firebaseapp.com". Set NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=lebazone.store and
+// Firebase's sign-in pages are served through this site (Firebase "proxy auth requests").
+const firebaseProject = (process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "").trim();
+if (firebaseProject && !/^x+$/i.test(firebaseProject) && process.env.NEXT_PUBLIC_SEO !== "false") {
+  nextConfig.rewrites = async () => ({
+    beforeFiles: [
+      {
+        source: "/__/auth/:path*",
+        destination: `https://${firebaseProject}.firebaseapp.com/__/auth/:path*`,
+      },
+    ],
+  });
+}
+
 if (process.env.NEXT_PUBLIC_SEO === "false") {
   // Replaces "standalone" — a static export ships HTML only, no node server.
   nextConfig.output = "export";

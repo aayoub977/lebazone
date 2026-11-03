@@ -756,6 +756,11 @@ export function Login({ showLogin, setShowLogin, setMobileActiveKey }: LoginProp
     } catch (error: any) {
       if (error?.message?.includes("auth/popup-closed-by-user")) {
         toast.error(t("popup_closed_by_user"));
+      } else {
+        // Custom (Lebazone): say something instead of failing silently (e.g. Firebase
+        // keys missing in the website .env, or this domain not authorised in Firebase).
+        console.error("Google sign-in failed:", error?.code || error?.message || error);
+        toast.error(t("something_went_wrong"));
       }
     }
   };

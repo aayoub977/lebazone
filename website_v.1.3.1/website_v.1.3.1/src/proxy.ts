@@ -80,5 +80,5 @@ export async function proxy(request: NextRequest) {
 export const config = {
   // Skip framework internals and static files outright — cheaper than entering
   // the proxy body for every asset request.
-  matcher: ["/((?!_next/static|_next/image|_next/data|favicon.ico|.*\\..*).*)"],
+  matcher: ["/((?!_next/static|_next/image|_next/data|__/|favicon.ico|.*\\..*).*)"],
 };
