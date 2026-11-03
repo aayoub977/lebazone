@@ -1,0 +1,51 @@
+<?php
+// Local-dev (Hader): prepare the UAE — country, emirates, AED, +971, Dubai time, 5% VAT.
+// Idempotent. Customers only see the UAE once you draw a UAE delivery zone + store.
+$base = __DIR__ . '/../admin_panel_v1.3.1';
+require $base . '/vendor/autoload.php';
+$app = require $base . '/bootstrap/app.php';
+$app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+
+use App\Models\Country;
+use App\Models\Region;
+use App\Services\LanguageService;
+use Illuminate\Support\Facades\DB;
+
+$c = Country::whereRaw('UPPER(code) = ?', ['AE'])->first() ?? new Country();
+$isNew = !$c->exists;
+$c->name = 'United Arab Emirates';
+$c->dial_code = '+971';
+$c->min_mobile_length = 9;
+$c->max_mobile_length = 9;
+$c->code = 'AE';
+$c->currency = 'AED ';
+$c->currency_code = 'AED';
+$c->decimal_point = 2;
+$c->date_format = 'd-m-Y';
+$c->time_format = 'h:i A';
+$c->timezone = 'Asia/Dubai';
+$c->status = 1;
+if ($isNew) {
+    $c->is_default = 0;
+    $c->payment_gateways = ['payment_method_settings' => 1, 'cod_payment_method' => 1, 'cod_mode' => 'global',
+        'tabby_payment_method' => 0, 'tamara_payment_method' => 0, 'stripe_payment_method' => 0];
+    foreach (['privacy_policy', 'return_policy', 'shipping_policy', 'cancellation_policy', 'terms_conditions',
+              'privacy_policy_delivery_boy', 'terms_conditions_delivery_boy'] as $f) {
+        $c->$f = '<p>' . ucwords(str_replace('_', ' ', $f)) . '</p>';
+    }
+}
+$c->save();
+$lang = app(LanguageService::class)->getDefaultLanguage();
+if ($lang) {
+    $c->saveTranslation($lang->id, ['name' => 'United Arab Emirates']);
+}
+$regions = Region::importFromDataset((int) $c->id, 'AE', null, $lang?->id);
+
+// 5% VAT on everything sold to/within the UAE (origin = UAE store).
+$rule = DB::table('tax_rules')->where('country_id', $c->id)->whereNull('region_id')->whereNull('tax_category_id')->first();
+if (!$rule) {
+    $ruleId = DB::table('tax_rules')->insertGetId(['country_id' => $c->id, 'region_id' => null, 'tax_category_id' => null,
+        'place_of_supply' => 'any', 'status' => 1, 'created_at' => now(), 'updated_at' => now()]);
+    DB::table('tax_rule_components')->insert(['tax_rule_id' => $ruleId, 'name' => 'VAT', 'rate' => 5, 'sort_order' => 0]);
+}
+echo "UAE ready (AED, +971, Asia/Dubai, 5% VAT). Emirates imported: {$regions}\n";

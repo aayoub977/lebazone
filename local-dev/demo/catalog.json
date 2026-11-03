@@ -1,0 +1,45 @@
+{
+  "categories": [
+    {"key": "groceries",   "name": "Groceries",        "ar": "بقالة",            "color": "#16A34A"},
+    {"key": "beverages",   "name": "Beverages",        "ar": "مشروبات",          "color": "#0284C7"},
+    {"key": "snacks",      "name": "Snacks & Sweets",  "ar": "سناكات وحلويات",   "color": "#EA580C"},
+    {"key": "electronics", "name": "Electronics",      "ar": "إلكترونيات",       "color": "#4F46E5"},
+    {"key": "home",        "name": "Home & Kitchen",   "ar": "المنزل والمطبخ",   "color": "#0D9488"},
+    {"key": "beauty",      "name": "Beauty & Care",    "ar": "الجمال والعناية",  "color": "#DB2777"}
+  ],
+  "brands": [
+    {"key": "cedar",  "name": "Cedar Farms",  "color": "#15803D"},
+    {"key": "basics", "name": "Hader Basics", "color": "#0369A1"},
+    {"key": "volt",   "name": "Volt",         "color": "#4338CA"},
+    {"key": "glow",   "name": "Pure Glow",    "color": "#BE185D"},
+    {"key": "mezza",  "name": "Mezza House",  "color": "#C2410C"}
+  ],
+  "products": [
+    {"sku": "HDR-GRC-001", "cat": "groceries", "brand": "cedar",  "name": "Extra Virgin Olive Oil 1L",       "ar": "زيت زيتون بكر ممتاز 1 لتر",   "price": 12.50, "sale": 10.99},
+    {"sku": "HDR-GRC-002", "cat": "groceries", "brand": "cedar",  "name": "Za'atar Mix 250g",                "ar": "زعتر مخلوط 250 غ",           "price": 4.50,  "sale": 3.99},
+    {"sku": "HDR-GRC-003", "cat": "groceries", "brand": "cedar",  "name": "Labneh 500g",                     "ar": "لبنة 500 غ",                 "price": 3.50,  "sale": 3.50},
+    {"sku": "HDR-GRC-004", "cat": "groceries", "brand": "basics", "name": "Basmati Rice 5kg",                "ar": "أرز بسمتي 5 كغ",             "price": 9.99,  "sale": 8.49},
+    {"sku": "HDR-GRC-005", "cat": "groceries", "brand": "basics", "name": "Arabic Bread (6 pcs)",            "ar": "خبز عربي (6 أرغفة)",          "price": 1.20,  "sale": 1.20},
+    {"sku": "HDR-BEV-001", "cat": "beverages", "brand": "basics", "name": "Spring Water 6 x 1.5L",           "ar": "مياه ينابيع 6 × 1.5 لتر",     "price": 3.00,  "sale": 2.50},
+    {"sku": "HDR-BEV-002", "cat": "beverages", "brand": "cedar",  "name": "Fresh Orange Juice 1L",           "ar": "عصير برتقال طازج 1 لتر",      "price": 3.75,  "sale": 3.25},
+    {"sku": "HDR-BEV-003", "cat": "beverages", "brand": "mezza",  "name": "Arabic Coffee with Cardamom 250g","ar": "قهوة عربية بالهيل 250 غ",     "price": 6.50,  "sale": 5.99},
+    {"sku": "HDR-BEV-004", "cat": "beverages", "brand": "basics", "name": "Green Tea (25 bags)",             "ar": "شاي أخضر (25 كيس)",          "price": 2.99,  "sale": 2.99},
+    {"sku": "HDR-SNK-001", "cat": "snacks",    "brand": "mezza",  "name": "Mixed Nuts 500g",                 "ar": "مكسرات مشكلة 500 غ",         "price": 11.00, "sale": 9.50},
+    {"sku": "HDR-SNK-002", "cat": "snacks",    "brand": "mezza",  "name": "Dark Chocolate Bar 100g",         "ar": "لوح شوكولا داكنة 100 غ",      "price": 2.50,  "sale": 1.99},
+    {"sku": "HDR-SNK-003", "cat": "snacks",    "brand": "basics", "name": "Potato Chips 150g",               "ar": "رقائق بطاطا 150 غ",          "price": 1.75,  "sale": 1.50},
+    {"sku": "HDR-SNK-004", "cat": "snacks",    "brand": "mezza",  "name": "Maamoul Box (12 pcs)",            "ar": "علبة معمول (12 قطعة)",       "price": 8.00,  "sale": 7.00},
+    {"sku": "HDR-ELC-001", "cat": "electronics","brand": "volt",  "name": "Wireless Earbuds",                "ar": "سماعات لاسلكية",             "price": 39.00, "sale": 29.99},
+    {"sku": "HDR-ELC-002", "cat": "electronics","brand": "volt",  "name": "Fast Charger 25W",                "ar": "شاحن سريع 25 واط",           "price": 15.00, "sale": 12.00},
+    {"sku": "HDR-ELC-003", "cat": "electronics","brand": "volt",  "name": "Power Bank 20000mAh",             "ar": "بطارية متنقلة 20000 mAh",     "price": 29.00, "sale": 24.99},
+    {"sku": "HDR-ELC-004", "cat": "electronics","brand": "volt",  "name": "USB-C Cable 2m",                  "ar": "كابل USB-C بطول 2 م",         "price": 6.00,  "sale": 5.00},
+    {"sku": "HDR-ELC-005", "cat": "electronics","brand": "volt",  "name": "Bluetooth Speaker",               "ar": "مكبر صوت بلوتوث",           "price": 45.00, "sale": 39.00},
+    {"sku": "HDR-HOM-001", "cat": "home",      "brand": "basics", "name": "Non-stick Frying Pan 28cm",       "ar": "مقلاة غير لاصقة 28 سم",       "price": 22.00, "sale": 18.50},
+    {"sku": "HDR-HOM-002", "cat": "home",      "brand": "basics", "name": "Electric Kettle 1.7L",            "ar": "غلاية كهربائية 1.7 لتر",      "price": 25.00, "sale": 21.00},
+    {"sku": "HDR-HOM-003", "cat": "home",      "brand": "basics", "name": "Glass Food Containers (Set of 5)", "ar": "علب حفظ زجاجية (5 قطع)",     "price": 18.00, "sale": 15.00},
+    {"sku": "HDR-HOM-004", "cat": "home",      "brand": "basics", "name": "Dish Soap 750ml",                 "ar": "سائل جلي 750 مل",            "price": 2.50,  "sale": 2.25},
+    {"sku": "HDR-BTY-001", "cat": "beauty",    "brand": "glow",   "name": "Moisturizing Cream 50ml",         "ar": "كريم مرطب 50 مل",            "price": 9.00,  "sale": 7.50},
+    {"sku": "HDR-BTY-002", "cat": "beauty",    "brand": "glow",   "name": "Argan Oil Shampoo 400ml",         "ar": "شامبو بزيت الأرغان 400 مل",   "price": 5.50,  "sale": 4.75},
+    {"sku": "HDR-BTY-003", "cat": "beauty",    "brand": "glow",   "name": "Sunscreen SPF 50",                "ar": "واقي شمس SPF 50",            "price": 12.00, "sale": 10.00},
+    {"sku": "HDR-BTY-004", "cat": "beauty",    "brand": "glow",   "name": "Whitening Toothpaste 100ml",      "ar": "معجون أسنان مبيّض 100 مل",    "price": 2.25,  "sale": 2.00}
+  ]
+}

@@ -1,0 +1,41 @@
+# Lebazone: what is NEVER uploaded to GitHub - passwords, customer data, build output.
+.env
+**/.env
+!**/.env.example
+.env.*
+!.env.example
+**/node_modules/
+**/vendor/
+**/.next/
+**/storage/
+admin_panel_v1.3.1/public/build/
+admin_panel_v1.3.1/public/storage
+admin_panel_v1.3.1/public/hot
+admin_panel_v1.3.1/public/sw.js
+**/tsconfig.tsbuildinfo
+# phone apps (not needed on the server; hold signing keys / Firebase files)
+apps/
+# local-only folders: tunnel key, Firebase key, backups, logs, tools, the move package
+local-dev/move-package/
+local-dev/backups/
+local-dev/tools/
+local-dev/tunnel/
+local-dev/firebase/
+local-dev/tmp/
+local-dev/server/logs/
+local-dev/LOCAL_LOGINS.txt
+local-dev/*.log
+local-dev/*-log.txt
+local-dev/*log*.txt
+local-dev/*.zip
+local-dev/app-run-steps.txt
+*.pem
+*.key
+*.jks
+*.keystore
+google-services.json
+GoogleService-Info.plist
+*service-account*.json
+*firebase-adminsdk*.json
+.DS_Store
+Thumbs.db

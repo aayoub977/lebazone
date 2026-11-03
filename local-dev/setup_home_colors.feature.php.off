@@ -1,0 +1,58 @@
+<?php
+// Local-dev (Hader): the stock home layout uses a bright yellow header background
+// (#FFE94B). Swap it for a soft warm cream with dark text, so the blue Hader logo
+// stands out. Only touches the stock default (and the blue tried briefly) — any
+// colour you picked yourself in the Home Builder stays.
+$base = __DIR__ . '/../admin_panel_v1.3.1';
+require $base . '/vendor/autoload.php';
+$app = require $base . '/bootstrap/app.php';
+$app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+
+use Illuminate\Support\Facades\DB;
+
+const HADER_OLD = ['#FFE94B', '#0369A1'];
+const HADER_BG = '#FFF7ED';
+const HADER_TEXT = '#0F172A';
+
+function hader_recolor($node, int &$n)
+{
+    if (!is_array($node)) {
+        return $node;
+    }
+    foreach (['color', 'background_color'] as $k) {
+        if (isset($node[$k]) && is_string($node[$k]) && in_array(strtoupper($node[$k]), HADER_OLD, true)) {
+            $node[$k] = HADER_BG;
+            if (!isset($node['text_color']) || in_array(strtoupper((string) $node['text_color']), ['', '#000000', '#000', '#FFFFFF', '#FFF'], true)) {
+                $node['text_color'] = HADER_TEXT;
+            }
+            $n++;
+        }
+    }
+    foreach ($node as $k => $v) {
+        if (is_array($v)) {
+            $node[$k] = hader_recolor($v, $n);
+        }
+    }
+    return $node;
+}
+
+$changed = 0;
+foreach (DB::table('home_layouts')->get() as $row) {
+    $upd = [];
+    foreach (['draft_json', 'published_json'] as $col) {
+        if (!isset($row->$col) || $row->$col === null) {
+            continue;
+        }
+        $data = json_decode($row->$col, true);
+        $n = 0;
+        $new = hader_recolor($data, $n);
+        if ($n) {
+            $upd[$col] = json_encode($new, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        }
+    }
+    if ($upd) {
+        DB::table('home_layouts')->where('id', $row->id)->update($upd);
+        $changed++;
+    }
+}
+echo "Home layout colours: {$changed} layout(s) switched to the Hader cream background.\n";

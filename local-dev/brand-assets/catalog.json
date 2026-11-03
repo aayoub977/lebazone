@@ -1,0 +1,275 @@
+{
+ "categories": [
+  {
+   "key": "audio",
+   "name": "Audio",
+   "ar": "صوتيات",
+   "color": "#DC2626"
+  },
+  {
+   "key": "wearables",
+   "name": "Wearables",
+   "ar": "أجهزة قابلة للارتداء",
+   "color": "#111827"
+  },
+  {
+   "key": "power",
+   "name": "Power & Charging",
+   "ar": "الطاقة والشحن",
+   "color": "#2563EB"
+  },
+  {
+   "key": "cameras",
+   "name": "Cameras & Drones",
+   "ar": "كاميرات ودرون",
+   "color": "#7C3AED"
+  },
+  {
+   "key": "gaming",
+   "name": "Gaming",
+   "ar": "ألعاب",
+   "color": "#059669"
+  },
+  {
+   "key": "smarthome",
+   "name": "Smart Home",
+   "ar": "المنزل الذكي",
+   "color": "#EA580C"
+  },
+  {
+   "key": "computer",
+   "name": "Computer Accessories",
+   "ar": "ملحقات الكمبيوتر",
+   "color": "#0891B2"
+  }
+ ],
+ "brands": [
+  {
+   "key": "voltix",
+   "name": "Voltix",
+   "color": "#2563EB"
+  },
+  {
+   "key": "sonara",
+   "name": "Sonara",
+   "color": "#7C3AED"
+  },
+  {
+   "key": "kinetica",
+   "name": "Kinetica",
+   "color": "#059669"
+  },
+  {
+   "key": "orbit",
+   "name": "Orbit",
+   "color": "#EA580C"
+  },
+  {
+   "key": "pixelon",
+   "name": "Pixelon",
+   "color": "#0891B2"
+  }
+ ],
+ "products": [
+  {
+   "sku": "LBZ-AUD-001",
+   "cat": "audio",
+   "brand": "sonara",
+   "name": "Wireless Earbuds Pro",
+   "ar": "سماعات لاسلكية برو",
+   "price": 49,
+   "sale": 39,
+   "shape": "earbuds"
+  },
+  {
+   "sku": "LBZ-AUD-002",
+   "cat": "audio",
+   "brand": "sonara",
+   "name": "Noise-Cancelling Headphones",
+   "ar": "سماعات عازلة للضوضاء",
+   "price": 119,
+   "sale": 99,
+   "shape": "headphones"
+  },
+  {
+   "sku": "LBZ-AUD-003",
+   "cat": "audio",
+   "brand": "sonara",
+   "name": "Bluetooth Speaker Mini",
+   "ar": "مكبر صوت بلوتوث صغير",
+   "price": 35,
+   "sale": 29,
+   "shape": "speaker"
+  },
+  {
+   "sku": "LBZ-WEA-001",
+   "cat": "wearables",
+   "brand": "kinetica",
+   "name": "Smart Watch S2",
+   "ar": "ساعة ذكية S2",
+   "price": 89,
+   "sale": 74,
+   "shape": "watch"
+  },
+  {
+   "sku": "LBZ-WEA-002",
+   "cat": "wearables",
+   "brand": "kinetica",
+   "name": "Fitness Band",
+   "ar": "سوار رياضي ذكي",
+   "price": 39,
+   "sale": 32,
+   "shape": "band"
+  },
+  {
+   "sku": "LBZ-PWR-001",
+   "cat": "power",
+   "brand": "voltix",
+   "name": "Power Bank 20000mAh",
+   "ar": "بطارية متنقلة 20000 mAh",
+   "price": 32,
+   "sale": 27,
+   "shape": "powerbank"
+  },
+  {
+   "sku": "LBZ-PWR-002",
+   "cat": "power",
+   "brand": "voltix",
+   "name": "65W GaN Fast Charger",
+   "ar": "شاحن سريع 65 واط",
+   "price": 29,
+   "sale": 24,
+   "shape": "charger"
+  },
+  {
+   "sku": "LBZ-PWR-003",
+   "cat": "power",
+   "brand": "voltix",
+   "name": "USB-C Cable 2m",
+   "ar": "كابل USB-C بطول 2 م",
+   "price": 9,
+   "sale": 7,
+   "shape": "cable"
+  },
+  {
+   "sku": "LBZ-PWR-004",
+   "cat": "power",
+   "brand": "voltix",
+   "name": "Wireless Charging Pad",
+   "ar": "قاعدة شحن لاسلكي",
+   "price": 22,
+   "sale": 18,
+   "shape": "wpad"
+  },
+  {
+   "sku": "LBZ-CAM-001",
+   "cat": "cameras",
+   "brand": "orbit",
+   "name": "Action Camera 4K",
+   "ar": "كاميرا أكشن 4K",
+   "price": 99,
+   "sale": 84,
+   "shape": "camera"
+  },
+  {
+   "sku": "LBZ-CAM-002",
+   "cat": "cameras",
+   "brand": "orbit",
+   "name": "Mini Drone with HD Camera",
+   "ar": "درون صغير بكاميرا HD",
+   "price": 149,
+   "sale": 129,
+   "shape": "drone"
+  },
+  {
+   "sku": "LBZ-CAM-003",
+   "cat": "cameras",
+   "brand": "orbit",
+   "name": "Phone Gimbal Stabilizer",
+   "ar": "مثبت هاتف جيمبل",
+   "price": 69,
+   "sale": 59,
+   "shape": "gimbal"
+  },
+  {
+   "sku": "LBZ-GAM-001",
+   "cat": "gaming",
+   "brand": "pixelon",
+   "name": "Wireless Gamepad",
+   "ar": "يد تحكم لاسلكية",
+   "price": 45,
+   "sale": 38,
+   "shape": "gamepad"
+  },
+  {
+   "sku": "LBZ-GAM-002",
+   "cat": "gaming",
+   "brand": "pixelon",
+   "name": "RGB Gaming Mouse",
+   "ar": "فأرة ألعاب RGB",
+   "price": 29,
+   "sale": 24,
+   "shape": "mouse"
+  },
+  {
+   "sku": "LBZ-GAM-003",
+   "cat": "gaming",
+   "brand": "pixelon",
+   "name": "Mechanical Keyboard",
+   "ar": "لوحة مفاتيح ميكانيكية",
+   "price": 69,
+   "sale": 58,
+   "shape": "keyboard"
+  },
+  {
+   "sku": "LBZ-SMH-001",
+   "cat": "smarthome",
+   "brand": "orbit",
+   "name": "Smart LED Bulb",
+   "ar": "لمبة LED ذكية",
+   "price": 12,
+   "sale": 10,
+   "shape": "bulb"
+  },
+  {
+   "sku": "LBZ-SMH-002",
+   "cat": "smarthome",
+   "brand": "orbit",
+   "name": "Smart Wi-Fi Plug",
+   "ar": "مقبس واي فاي ذكي",
+   "price": 15,
+   "sale": 12,
+   "shape": "plug"
+  },
+  {
+   "sku": "LBZ-SMH-003",
+   "cat": "smarthome",
+   "brand": "pixelon",
+   "name": "10\" Ring Light",
+   "ar": "إضاءة دائرية 10 إنش",
+   "price": 25,
+   "sale": 21,
+   "shape": "ringlight"
+  },
+  {
+   "sku": "LBZ-CMP-001",
+   "cat": "computer",
+   "brand": "voltix",
+   "name": "Portable SSD 1TB",
+   "ar": "قرص SSD محمول 1 تيرابايت",
+   "price": 95,
+   "sale": 82,
+   "shape": "ssd"
+  },
+  {
+   "sku": "LBZ-CMP-002",
+   "cat": "computer",
+   "brand": "kinetica",
+   "name": "Aluminium Laptop Stand",
+   "ar": "حامل لابتوب ألمنيوم",
+   "price": 35,
+   "sale": 29,
+   "shape": "stand"
+  }
+ ]
+}

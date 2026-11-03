@@ -1,0 +1,20 @@
+@echo off
+rem Lebazone server: daily backup of the database (+ photos every Sunday). Keeps 14 days.
+setlocal EnableDelayedExpansion
+set "SRV=%~dp0"
+for %%I in ("%SRV%..\..") do set "ROOT=%%~fI"
+set "ADMIN=%ROOT%\admin_panel_v1.3.1"
+set "DEST=C:\lebazone-backups"
+if exist "%USERPROFILE%\OneDrive" set "DEST=%USERPROFILE%\OneDrive\lebazone-backups"
+if not exist "%DEST%" mkdir "%DEST%"
+set "MYSQLDUMP="
+for /d %%D in (C:\laragon\bin\mysql\*) do if exist "%%D\bin\mysqldump.exe" set "MYSQLDUMP=%%D\bin\mysqldump.exe"
+set "DBN=lebazone"
+for /f "tokens=1,* delims==" %%A in ('findstr /b "DB_DATABASE=" "%ADMIN%\.env"') do set "DBN=%%B"
+for /f %%A in ('powershell -NoProfile -Command "Get-Date -Format yyyy-MM-dd"') do set "D=%%A"
+"%MYSQLDUMP%" -u root -h 127.0.0.1 --single-transaction --routines --triggers --default-character-set=utf8mb4 "!DBN!" > "%DEST%\lebazone-db-%D%.sql"
+powershell -NoProfile -Command "Compress-Archive -Force -Path '%DEST%\lebazone-db-%D%.sql' -DestinationPath '%DEST%\lebazone-db-%D%.zip'; Remove-Item '%DEST%\lebazone-db-%D%.sql'"
+for /f %%A in ('powershell -NoProfile -Command "(Get-Date).DayOfWeek"') do set "DOW=%%A"
+if /i "%DOW%"=="Sunday" powershell -NoProfile -Command "Compress-Archive -Force -Path '%ADMIN%\storage\app\public' -DestinationPath '%DEST%\lebazone-photos-%D%.zip'"
+powershell -NoProfile -Command "Get-ChildItem '%DEST%' -Filter 'lebazone-*' | Where-Object { $_.LastWriteTime -lt (Get-Date).AddDays(-14) } | Remove-Item -Force"
+echo %date% %time% backup done to %DEST% >> "%SRV%logs\backup.log"

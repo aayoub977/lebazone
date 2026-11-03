@@ -1,0 +1,264 @@
+<?php
+// Local-dev (Hader): demo data so the shop isn't empty —
+// a "Beirut" delivery zone, an active store in it, 6 categories, 5 brands and 26 products.
+// Safe to run more than once: anything already there is reused, not duplicated.
+$base = __DIR__ . '/../admin_panel_v1.3.1';
+require $base . '/vendor/autoload.php';
+$app = require $base . '/bootstrap/app.php';
+$app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+
+use App\Http\Controllers\API\ProductApisController;
+use App\Http\Controllers\API\StoreApiController;
+use App\Http\Controllers\API\ZoneApiController;
+use App\Models\Brand;
+use App\Models\Category;
+use App\Models\Country;
+use App\Models\Language;
+use App\Models\ProductVariant;
+use App\Models\Store;
+use App\Models\SupportedLanguage;
+use App\Models\Zone;
+use App\Services\LanguageService;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\File;
+
+function call_api($controller, string $method, array $data): array
+{
+    $res = app($controller)->$method(Request::create('/', 'POST', $data));
+    $out = $res->getData(true);
+    if (empty($out['status'])) {
+        fwrite(STDERR, "  ! {$method} failed: " . ($out['message'] ?? 'unknown error') . "\n");
+        exit(1);
+    }
+    return $out['data'] ?? [];
+}
+
+$catalog = json_decode(file_get_contents(__DIR__ . '/demo/catalog.json'), true);
+$lang = app(LanguageService::class)->getDefaultLanguage();
+if (!$lang) {
+    fwrite(STDERR, "No default admin language found.\n");
+    exit(1);
+}
+$langId = (int) $lang->id;
+$arSl = SupportedLanguage::where('code', 'ar')->first();
+$arLangId = $arSl ? (int) Language::where('supported_language_id', $arSl->id)->where('system_type', 4)->value('id') : 0;
+
+$country = Country::whereRaw('UPPER(code) = ?', ['LB'])->first();
+if (!$country) {
+    fwrite(STDERR, "Lebanon isn't set up yet — run apply-updates.bat first.\n");
+    exit(1);
+}
+
+// ---- Images -> storage/app/public/demo ----
+$dest = $base . '/storage/app/public/demo';
+File::ensureDirectoryExists($dest);
+foreach (File::files(__DIR__ . '/demo/images') as $f) {
+    File::copy($f->getPathname(), $dest . '/' . $f->getFilename());
+}
+
+// ---- Zone: reuse an active Lebanese zone that already covers Beirut, else create "Beirut" ----
+function point_in_zone(Zone $z, float $lat, float $lng): bool
+{
+    foreach ([$z->polygon_boundary_quick, $z->polygon_boundary_ecommerce] as $poly) {
+        if (!is_array($poly) || count($poly) < 3) {
+            continue;
+        }
+        $in = false;
+        for ($i = 0, $j = count($poly) - 1; $i < count($poly); $j = $i++) {
+            $yi = (float) $poly[$i]['lat']; $xi = (float) $poly[$i]['lng'];
+            $yj = (float) $poly[$j]['lat']; $xj = (float) $poly[$j]['lng'];
+            if ((($yi > $lat) !== ($yj > $lat)) && ($lng < ($xj - $xi) * ($lat - $yi) / (($yj - $yi) ?: 1e-12) + $xi)) {
+                $in = !$in;
+            }
+        }
+        if ($in) {
+            return true;
+        }
+    }
+    return false;
+}
+$zone = Zone::where('slug', 'beirut')->first()
+    ?? Zone::where('country_id', $country->id)->where('status', 1)->get()
+        ->sortByDesc(fn (Zone $z) => point_in_zone($z, 33.8963, 35.4823) ? 1 : 0)->first();
+if ($zone) {
+    echo "Using your existing zone: {$zone->name} (#{$zone->id}, {$zone->sales_channel})\n";
+    if (!point_in_zone($zone, 33.8963, 35.4823) || !point_in_zone($zone, 34.4367, 35.8497)) {
+        // The hand-drawn boundary misses Beirut/Tripoli — replace it with an outline of all of Lebanon
+        // (generous on the sea side so coastal addresses are never cut off).
+        $lebanon = [
+            ['lat' => 34.7300, 'lng' => 35.8500], ['lat' => 34.7000, 'lng' => 36.1000],
+            ['lat' => 34.6600, 'lng' => 36.4500], ['lat' => 34.5200, 'lng' => 36.6300],
+            ['lat' => 34.2000, 'lng' => 36.6300], ['lat' => 34.0000, 'lng' => 36.4600],
+            ['lat' => 33.8300, 'lng' => 36.2600], ['lat' => 33.6000, 'lng' => 36.0600],
+            ['lat' => 33.4500, 'lng' => 35.9600], ['lat' => 33.3000, 'lng' => 35.8300],
+            ['lat' => 33.2700, 'lng' => 35.6300], ['lat' => 33.0800, 'lng' => 35.5200],
+            ['lat' => 33.0800, 'lng' => 35.1000], ['lat' => 33.1000, 'lng' => 35.0300],
+            ['lat' => 33.6000, 'lng' => 35.2300], ['lat' => 34.0000, 'lng' => 35.4800],
+            ['lat' => 34.4000, 'lng' => 35.6800],
+        ];
+        $served = $zone->servedChannels();
+        if (in_array('quick', $served, true)) {
+            $zone->polygon_boundary_quick = $lebanon;
+        }
+        if (in_array('ecommerce', $served, true)) {
+            $zone->polygon_boundary_ecommerce = $lebanon;
+        }
+        $zone->status = 1;
+        $zone->save();
+        echo "  Redrew its boundary to cover all of Lebanon (Beirut was outside it).\n";
+    }
+}
+if (!$zone) {
+    $poly = json_encode([
+        ['lat' => 33.9300, 'lng' => 35.4700],
+        ['lat' => 33.9300, 'lng' => 35.5900],
+        ['lat' => 33.8200, 'lng' => 35.5900],
+        ['lat' => 33.8200, 'lng' => 35.4600],
+        ['lat' => 33.8800, 'lng' => 35.4500],
+    ]);
+    $z = call_api(ZoneApiController::class, 'save', [
+        'language_id' => $langId, 'name' => 'Beirut', 'city' => 'Beirut', 'state' => 'Beirut',
+        'country_id' => $country->id, 'status' => 1, 'sales_channel' => 'both',
+        'polygon_boundary_quick' => $poly, 'polygon_boundary_ecommerce' => $poly,
+        // Quick (same-day): $2 delivery, free above $30.
+        'quick_distance_unit' => 'km', 'quick_base_delivery_charge' => 2, 'quick_base_distance' => 5,
+        'quick_charge_per_km' => 0.25, 'quick_travel_time_per_km' => 3,
+        'quick_minimum_order_amount' => 5, 'quick_free_delivery_above' => 30,
+        // Standard: $3 flat, free above $50, 2 days.
+        'ecommerce_pricing_strategy' => 'flat', 'ecommerce_default_delivery_charge' => 3,
+        'ecommerce_flat_delivery_charge' => 3, 'ecommerce_flat_free_delivery_above' => 50,
+        'ecommerce_free_delivery_threshold' => 50, 'ecommerce_delivery_days' => 2,
+    ]);
+    $zone = Zone::find($z['id']);
+    echo "Zone created: Beirut (#{$zone->id})\n";
+} else {
+    if ((int) $zone->status !== 1) {
+        $zone->status = 1;
+        $zone->save();
+    }
+}
+
+// The website starts in same-day ("quick") mode, so the zone must serve both channels.
+if ($zone->sales_channel !== 'both') {
+    $poly = $zone->polygon_boundary_ecommerce ?: $zone->polygon_boundary_quick;
+    $zone->sales_channel = 'both';
+    $zone->polygon_boundary_quick = $zone->polygon_boundary_quick ?: $poly;
+    $zone->polygon_boundary_ecommerce = $zone->polygon_boundary_ecommerce ?: $poly;
+    if (!(float) $zone->base_delivery_charge) {
+        $zone->distance_unit = $zone->distance_unit ?: 'km';
+        $zone->base_delivery_charge = 2;
+        $zone->base_distance = 5;
+        $zone->charge_per_km = 0.25;
+        $zone->travel_time_per_km = 3;
+        $zone->minimum_order_amount = 5;
+        $zone->free_delivery_above = 30;
+    }
+    if (!(float) $zone->flat_delivery_charge && !(float) $zone->default_delivery_charge) {
+        $zone->pricing_strategy = $zone->pricing_strategy ?: 'flat';
+        $zone->default_delivery_charge = 3;
+        $zone->flat_delivery_charge = 3;
+        $zone->flat_free_delivery_above = 50;
+        $zone->free_delivery_threshold = 50;
+        $zone->ecommerce_delivery_days = $zone->ecommerce_delivery_days ?: 2;
+    }
+    $zone->save();
+    echo "  Zone now offers same-day AND standard delivery.\n";
+}
+
+// ---- Store in that zone ----
+$store = Store::where('zone_id', $zone->id)->first();
+$storePw = 'Hader@Beirut2026';
+if (!$store) {
+    $s = call_api(StoreApiController::class, 'save', [
+        'language_id' => $langId, 'name' => 'Hader Beirut', 'provider' => 'Hader',
+        'fulfillment_type' => $zone->sales_channel ?: 'both', 'service_modes' => 'delivery', 'zone_id' => $zone->id,
+        'address' => 'Hamra Street, Beirut, Lebanon', 'formatted_address' => 'Hamra Street, Beirut, Lebanon',
+        'latitude' => 33.8963, 'longitude' => 35.4823, 'contact_number' => '+96170000000',
+        'email' => 'beirut.store@hader.local', 'password' => $storePw, 'confirm_password' => $storePw,
+        'preparation_time' => 15, 'status' => 1,
+    ]);
+    $store = Store::find($s['id']);
+    @file_put_contents(__DIR__ . '/LOCAL_LOGINS.txt',
+        "\nStore panel login (Hader Beirut): beirut.store@hader.local / {$storePw}\n", FILE_APPEND);
+    echo "Store created: Hader Beirut (#{$store->id})\n";
+} else {
+    $store->status = 1;
+    $store->fulfillment_type = $zone->sales_channel;
+    if ($zone->sales_channel === 'both' && !in_array($store->pickup_channels, ['quick', 'ecommerce', 'both'], true)) {
+        $store->pickup_channels = 'both';
+    }
+    $store->save();
+    echo "Store exists: {$store->name} (#{$store->id}, {$store->fulfillment_type})\n";
+}
+
+// ---- Categories & brands ----
+$catIds = [];
+foreach ($catalog['categories'] as $i => $c) {
+    $slug = 'hader-' . $c['key'];
+    $cat = Category::where('slug', $slug)->first() ?? new Category();
+    if (!$cat->exists) {
+        $cat->slug = $slug;
+        $cat->name = $c['name'];
+        $cat->image = 'demo/cat-' . $c['key'] . '.png';
+        $cat->status = 1;
+        $cat->parent_id = 0;
+        $cat->row_order = $i + 1;
+        $cat->meta_title = $cat->meta_keywords = $cat->schema_markup = $cat->meta_description = '';
+        $cat->save();
+    }
+    $cat->saveTranslation($langId, ['name' => $c['name']]);
+    if ($arLangId) {
+        $cat->saveTranslation($arLangId, ['name' => $c['ar']]);
+    }
+    $catIds[$c['key']] = $cat->id;
+}
+$brandIds = [];
+foreach ($catalog['brands'] as $b) {
+    $brand = Brand::where('name', $b['name'])->first();
+    if (!$brand) {
+        $brand = new Brand();
+        $brand->name = $b['name'];
+        $brand->status = 1;
+        $brand->image = 'demo/brand-' . $b['key'] . '.png';
+        $brand->save();
+        $brand->saveTranslation($langId, ['name' => $b['name']]);
+    }
+    $brandIds[$b['key']] = $brand->id;
+}
+echo 'Categories: ' . count($catIds) . ', brands: ' . count($brandIds) . "\n";
+
+// ---- Products ----
+$made = 0;
+foreach ($catalog['products'] as $p) {
+    if (ProductVariant::where('sku', $p['sku'])->exists()) {
+        continue;
+    }
+    $desc = "<p>{$p['name']} — delivered fast across Beirut by Hader.</p>";
+    $trans = [$langId => ['name' => $p['name'], 'description' => $desc, 'short_description' => $p['name'],
+        'manufacturer' => $catalog['brands'][array_search($p['brand'], array_column($catalog['brands'], 'key'))]['name']]];
+    $vTrans = [$langId => ['name' => $p['name']]];
+    if ($arLangId) {
+        $trans[$arLangId] = ['name' => $p['ar'], 'description' => "<p>{$p['ar']}</p>", 'short_description' => $p['ar']];
+        $vTrans[$arLangId] = ['name' => $p['ar']];
+    }
+    call_api(ProductApisController::class, 'save', [
+        'language_id' => $langId, 'category_id' => $catIds[$p['cat']], 'brand_id' => $brandIds[$p['brand']],
+        'sales_channel' => 'both', 'product_type' => 0, 'status' => 1, 'is_draft' => 0,
+        'return_status' => 1, 'return_days' => 7, 'cancelable_status' => 1,
+        'till_status_quick' => 2, 'till_status_ecommerce' => 2, 'cod_allowed' => 1, 'total_allowed_quantity' => 10,
+        'translations' => json_encode($trans),
+        'variants' => json_encode([[
+            'name' => $p['name'], 'sku' => $p['sku'], 'translations' => $vTrans,
+            'image_path' => 'demo/' . strtolower($p['sku']) . '.png',
+            'gallery_paths' => [],
+            'store_stocks' => [[
+                'store_id' => $store->id, 'is_listed' => 1, 'stock_status' => 1,
+                'is_unlimited_stock' => 0, 'available' => rand(40, 200), 'min_alert' => 5,
+                'price' => $p['price'], 'discounted_price' => $p['sale'], 'purchase_price' => round($p['sale'] * 0.7, 2),
+            ]],
+        ]]),
+    ]);
+    $made++;
+}
+echo "Products added: {$made} (" . count($catalog['products']) . " in the demo catalog)\n";
+echo "Done. Open the website — it should go straight to the Hader Beirut shop.\n";

@@ -1,0 +1,44 @@
+<?php
+// Local-dev (Hader): a ready-made customer account for testing the app and website
+// (SMS/Firebase codes aren't set up yet, so signing up with a code can't finish),
+// and phone + password login switched on. Safe to run more than once.
+$base = __DIR__ . '/../admin_panel_v1.3.1';
+require $base . '/vendor/autoload.php';
+$app = require $base . '/bootstrap/app.php';
+$app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+
+use App\Models\Country;
+use App\Models\User;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+
+foreach (['phone_login' => '1', 'phone_auth_password' => '1'] as $k => $v) {
+    DB::table('settings')->updateOrInsert(['variable' => $k], ['value' => $v]); // settings has no timestamps
+}
+
+$mobile = '70000000';
+$cc = '+961';
+$password = 'Hader@1234';
+$user = User::withTrashed()->where('mobile', $mobile)->where('country_code', $cc)->first() ?? new User();
+$isNew = !$user->exists;
+if (method_exists($user, 'trashed') && $user->trashed()) {
+    $user->restore();
+}
+$user->name = $user->name ?: 'Test Customer';
+$user->email = $user->email ?: 'test.customer@hader.local';
+$user->country_code = $cc;
+$user->mobile = $mobile;
+$user->country_id = Country::whereRaw('UPPER(code) = ?', ['LB'])->value('id');
+$user->type = 'phone';
+$user->is_verified = 1;
+$user->status = 1;
+$user->password = bcrypt($password);
+$user->referral_code = $user->referral_code ?: strtoupper(Str::random(8));
+$user->language_id = $user->language_id ?: \App\Helpers\CommonHelper::getDefaultLanguageId();
+$user->save();
+
+if ($isNew) {
+    @file_put_contents(__DIR__ . '/LOCAL_LOGINS.txt',
+        "\nTest customer (app + website): phone +961 {$mobile} / password {$password}  (choose 'Login with password')\n", FILE_APPEND);
+}
+echo "Test customer ready: +961 {$mobile} / {$password}\n";
