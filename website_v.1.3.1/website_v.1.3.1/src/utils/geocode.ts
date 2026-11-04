@@ -99,7 +99,8 @@ const googleReverse = (
 const googleForward = (query: string): Promise<{ lat: number; lng: number }> =>
   new Promise((resolve, reject) => {
     const geocoder = new (window as any).google.maps.Geocoder();
-    geocoder.geocode({ address: query }, (results: any, status: string) => {
+    // Custom (Lebazone): Lebanon only.
+    geocoder.geocode({ address: query, componentRestrictions: { country: "lb" } }, (results: any, status: string) => {
       if (status !== "OK" || !results?.[0]) {
         reject(new Error(`Google forward failed: ${status}`));
         return;

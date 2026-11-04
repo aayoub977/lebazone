@@ -76,7 +76,7 @@ export const reverseGeocode = async (lat: number | string, lng: number | string)
 export const forwardGeocode = async (query: string) => {
   const url = `${NOMINATIM_BASE}/search?format=jsonv2&q=${encodeURIComponent(
     query,
-  )}&addressdetails=1&limit=1`;
+  )}&addressdetails=1&limit=1&countrycodes=lb`; // Custom (Lebazone): Lebanon only
   const res = await fetch(url, {
     headers: { Accept: "application/json" },
   });

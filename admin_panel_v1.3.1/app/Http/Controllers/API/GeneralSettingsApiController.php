@@ -1375,9 +1375,8 @@ class GeneralSettingsApiController extends Controller
                 $params['types'] = $request->types;
             }
 
-            if ($request->components) {
-                $params['components'] = $request->components;
-            }
+            // Custom (Lebazone): suggest places in the shop's countries only (Lebanon).
+            $params['components'] = $request->components ?: implode('|', array_map(fn ($c) => 'country:' . $c, $this->shopCountryCodes()));
 
             if ($request->sessiontoken) {
                 $params['sessiontoken'] = $request->sessiontoken;
@@ -1883,6 +1882,14 @@ class GeneralSettingsApiController extends Controller
         return $provider === 'google' ? 'google' : 'osm';
     }
 
+    /** Custom (Lebazone): ISO codes of the active shop countries, e.g. ['lb'] (Google allows max 5). */
+    private function shopCountryCodes(): array
+    {
+        $codes = \Illuminate\Support\Facades\DB::table('countries')->where('status', 1)->pluck('code')
+            ->map(fn ($c) => strtolower(trim((string) $c)))->filter(fn ($c) => strlen($c) === 2)->unique()->values()->all();
+        return array_slice($codes ?: ['lb'], 0, 5);
+    }
+
     public function placesAutocomplete(Request $request)
     {
         return $this->activeMapProvider() === 'google'
@@ -1928,6 +1935,8 @@ class GeneralSettingsApiController extends Controller
                 'addressdetails' => 1,
                 'limit'          => 5,
                 'accept-language' => $request->language ?? 'en',
+                // Custom (Lebazone): places in the shop's countries only (Lebanon).
+                'countrycodes'   => implode(',', $this->shopCountryCodes()),
             ];
             $data = $this->nominatimRequest('search', $params);
             if (isset($data['__error'])) {

@@ -14,6 +14,7 @@ import { darkThemeStyles } from "../../utils/mapColor";
 import MapLoader from "./MapLoader";
 import MapError from "./MapError";
 import type { MapComponentProps } from "./types";
+import { SHOP_MAP_BOUNDS, SHOP_MAP_MIN_ZOOM } from "./types";
 
 /**
  * Google Maps implementation of the common map interface.
@@ -69,6 +70,9 @@ export default function GoogleMapComponent({
       mapTypeControl: false,
       clickableIcons: false,
       styles: theme === "dark" ? darkThemeStyles : undefined,
+      // Custom (Lebazone): Lebanon only.
+      restriction: { latLngBounds: { ...SHOP_MAP_BOUNDS }, strictBounds: false },
+      minZoom: SHOP_MAP_MIN_ZOOM,
     }),
     [theme]
   );

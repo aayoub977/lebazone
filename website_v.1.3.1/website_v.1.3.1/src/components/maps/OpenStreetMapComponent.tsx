@@ -15,6 +15,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import MapLoader from "./MapLoader";
 import type { MapComponentProps, MapLatLng } from "./types";
+import { SHOP_MAP_BOUNDS, SHOP_MAP_MIN_ZOOM } from "./types";
 
 // Monotonic counter giving every mounted map a unique container key. Guarantees
 // React never reuses a DOM node between two Leaflet instances (Strict Mode
@@ -242,7 +243,18 @@ export default function OpenStreetMapComponent({
           no behavior change. */}
       <MapContainer
         key={`osm-map-${containerKey}`}
-        {...({ center, zoom, scrollWheelZoom: true } as object)}
+        {...({
+          center,
+          zoom,
+          scrollWheelZoom: true,
+          // Custom (Lebazone): Lebanon only.
+          maxBounds: [
+            [SHOP_MAP_BOUNDS.south, SHOP_MAP_BOUNDS.west],
+            [SHOP_MAP_BOUNDS.north, SHOP_MAP_BOUNDS.east],
+          ],
+          maxBoundsViscosity: 1.0,
+          minZoom: SHOP_MAP_MIN_ZOOM,
+        } as object)}
         style={containerStyle}
       >
         <MapReadyController mapRef={mapRef} onReady={onReady} />

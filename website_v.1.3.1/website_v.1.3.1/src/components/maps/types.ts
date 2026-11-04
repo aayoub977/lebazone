@@ -87,6 +87,19 @@ export const SUPPORTED_PROVIDERS = Object.freeze([
  */
 export const DEFAULT_MAP_PROVIDER: MapProvider = MAP_PROVIDERS.GOOGLE;
 
+/**
+ * Custom (Lebazone): every map stays on Lebanon (with a small margin) - customers can't
+ * pan or zoom out to other countries. Lebanon spans about 33.05-34.69 N, 35.10-36.62 E.
+ */
+export const SHOP_MAP_BOUNDS = Object.freeze({
+  south: 32.95,
+  west: 34.85,
+  north: 34.8,
+  east: 36.75,
+});
+/** Furthest the map can zoom out (8 = the whole country fills the map). */
+export const SHOP_MAP_MIN_ZOOM = 8;
+
 export const isSupportedProvider = (provider: unknown): provider is MapProvider =>
   typeof provider === "string" &&
   (SUPPORTED_PROVIDERS as readonly string[]).includes(provider.toLowerCase());
