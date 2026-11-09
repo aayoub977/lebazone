@@ -169,6 +169,36 @@ class ScanApiController extends ProductApisController
         return $rel;
     }
 
+    // ---- Custom (Lebazone): seller logins only ever see and change their own products ----
+    private $sellerMemo = false;
+
+    /** The seller behind the logged-in account, null for Lebazone staff (-1: a seller login not linked yet). */
+    private function currentSellerId(): ?int
+    {
+        if ($this->sellerMemo !== false) return $this->sellerMemo;
+        $u = null;
+        try { $u = auth('api')->user(); } catch (\Throwable $e) {}
+        if (!$u || !$u->role || $u->role->name !== 'Seller') return $this->sellerMemo = null;
+        return $this->sellerMemo = ((int) DB::table('sellers')->where('admin_id', $u->id)->value('id') ?: -1);
+    }
+
+    private function ownsProduct(int $productId): bool
+    {
+        $sid = $this->currentSellerId();
+        return $sid === null || (int) DB::table('products')->where('id', $productId)->value('seller_id') === $sid;
+    }
+
+    private function ownedOnly($ids)
+    {
+        return $this->currentSellerId() === null ? collect($ids)->values()
+            : collect($ids)->filter(fn ($id) => $this->ownsProduct((int) $id))->values();
+    }
+
+    private function notYours()
+    {
+        return CommonHelper::responseError('Product not found');
+    }
+
     /** Product with its colours, as the screen shows it. */
     private function payload(int $productId, ?string $matchedCode = null): array
     {
@@ -190,6 +220,9 @@ class ScanApiController extends ProductApisController
                 'barcode' => $v->barcode ?? '',
                 'color' => $color ?: 'Standard',
                 'image' => $this->url($v->image),
+                // Custom (Lebazone): the colour's other photos, so one can be made the main photo
+                'gallery' => \App\Models\ProductImages::where('product_variant_id', $v->id)->orderBy('id')->get(['id', 'image'])
+                    ->map(fn ($g) => ['id' => (int) $g->id, 'url' => $this->url($g->image)])->values()->all(),
                 'price' => $stock ? (float) $stock->price : null,
                 'sale_price' => $stock ? (float) $stock->discounted_price : null,
                 'stock' => $stock ? (int) $stock->available : 0,
@@ -202,6 +235,8 @@ class ScanApiController extends ProductApisController
         }
         return [
             'id' => $product->id,
+            'review' => (string) ($product->seller_review ?? ''), // Custom (Lebazone): pending / rejected for seller products
+            'review_note' => (string) ($product->seller_review_note ?? ''),
             'name' => $name,
             'category' => Category::where('id', $product->category_id)->value('name'),
             'category_id' => (int) $product->category_id,
@@ -239,7 +274,7 @@ class ScanApiController extends ProductApisController
         if ($code === '') return CommonHelper::responseError('Scan or type a barcode');
         $q = ProductVariant::query()->where('sku', $code);
         if (Schema::hasColumn('product_variants', 'barcode')) $q->orWhere('barcode', $code);
-        $productIds = $q->pluck('product_id')->unique()->values();
+        $productIds = $this->ownedOnly($q->pluck('product_id')->unique()->values());
         if ($productIds->isEmpty()) {
             return CommonHelper::responseWithData(['found' => false, 'code' => $code]);
         }
@@ -255,20 +290,25 @@ class ScanApiController extends ProductApisController
         $term = trim((string) $request->input('q', ''));
         if (mb_strlen($term) < 2) return CommonHelper::responseWithData([]);
         $ids = ProductVariant::where('name', 'like', "%$term%")->orWhere('sku', $term)
-            ->orderByDesc('id')->limit(10)->pluck('product_id')->unique()->values();
+            ->orderByDesc('id')->limit(60)->pluck('product_id')->unique()->values();
+        $ids = $this->ownedOnly($ids)->take(10);
         return CommonHelper::responseWithData($ids->map(fn ($id) => $this->payload((int) $id))->values());
     }
 
     /** Products added from this screen, newest first. */
     public function recent()
     {
-        $ids = ProductVariant::where('sku', 'like', 'LBZ0%')->orderByDesc('id')->limit(40)
-            ->pluck('product_id')->unique()->take(10)->values();
+        $sid = $this->currentSellerId();
+        $ids = $sid !== null
+            ? DB::table('products')->where('seller_id', $sid)->whereNull('deleted_at')->orderByDesc('id')->limit(10)->pluck('id')
+            : ProductVariant::where('sku', 'like', 'LBZ0%')->orderByDesc('id')->limit(40)
+                ->pluck('product_id')->unique()->take(10)->values();
         return CommonHelper::responseWithData($ids->map(fn ($id) => $this->payload((int) $id))->values());
     }
 
     public function product(Request $request)
     {
+        if (!$this->ownsProduct((int) $request->input('id'))) return $this->notYours();
         return CommonHelper::responseWithData($this->payload((int) $request->input('id')));
     }
 
@@ -281,6 +321,12 @@ class ScanApiController extends ProductApisController
         $price = (float) $request->input('price');
         $sale = $request->filled('sale_price') ? (float) $request->input('sale_price') : $price;
         $cost = $request->filled('cost') ? (float) $request->input('cost') : round($sale * 0.7, 2);
+        $sellerId = $this->currentSellerId();
+        if ($sellerId === -1) return CommonHelper::responseError('Your seller account is not set up yet - contact Lebazone');
+        if ($sellerId) { // what Lebazone pays the seller per piece = price minus commission
+            $pct = (float) DB::table('sellers')->where('id', $sellerId)->value('commission_percent');
+            $cost = round($sale * (1 - $pct / 100), 2);
+        }
         $colors = json_decode((string) $request->input('colors', '[]'), true) ?: [];
         if ($name === '') return CommonHelper::responseError('Enter the product name');
         if (!$categoryId) return CommonHelper::responseError('Choose a category');
@@ -353,6 +399,16 @@ class ScanApiController extends ProductApisController
         }
         $productId = (int) ProductVariant::where('sku', array_key_first($barcodes))->value('product_id');
         if (Schema::hasColumn('products', 'lbz_size')) DB::table('products')->where('id', $productId)->update(['lbz_size' => $size]);
+        if ($sellerId) {
+            // a seller's product stays off the shop until Lebazone approves it
+            DB::table('products')->where('id', $productId)->update(['seller_id' => $sellerId, 'status' => 0, 'seller_review' => 'pending', 'seller_review_note' => null]);
+            try {
+                $sname = (string) DB::table('sellers')->where('id', $sellerId)->value('business_name');
+                foreach (\App\Models\Admin::whereIn('role_id', [1, 2])->where('status', 1)->get() as $a) {
+                    $a->notify(new \App\Notifications\SellerProductAlert($productId, '🛍 ' . $sname . ' added "' . $name . '" - waiting for your approval (Sellers page)'));
+                }
+            } catch (\Throwable $e) { /* the notification is a nice-to-have */ }
+        }
         if (Schema::hasColumn('product_variants', 'barcode')) {
             foreach ($barcodes as $code => $bc) {
                 if ($bc !== '') ProductVariant::where('sku', $code)->update(['barcode' => $bc]);
@@ -369,7 +425,7 @@ class ScanApiController extends ProductApisController
         $size = strtoupper(trim((string) $request->input('size')));
         if (!in_array($size, self::SIZES, true)) return CommonHelper::responseError('Choose S, M, L or XL');
         $id = (int) $request->input('product_id');
-        if (!Product::where('id', $id)->exists()) return CommonHelper::responseError('Product not found');
+        if (!Product::where('id', $id)->exists() || !$this->ownsProduct($id)) return CommonHelper::responseError('Product not found');
         DB::table('products')->where('id', $id)->update(['lbz_size' => $size]);
         return CommonHelper::responseSuccessWithData('Size saved', $this->payload($id));
     }
@@ -379,6 +435,7 @@ class ScanApiController extends ProductApisController
     {
         if (!Schema::hasColumn('products', 'lbz_size')) return CommonHelper::responseWithData(['count' => 0, 'products' => []]);
         $q = DB::table('products')->whereNull('deleted_at')->where(fn ($w) => $w->whereNull('lbz_size')->orWhere('lbz_size', ''));
+        if (($sid = $this->currentSellerId()) !== null) $q->where('seller_id', $sid);
         $count = (clone $q)->count();
         $rows = $q->orderByDesc('id')->limit(40)->pluck('id');
         $out = [];
@@ -393,7 +450,7 @@ class ScanApiController extends ProductApisController
     public function addColor(Request $request)
     {
         $product = Product::with('variants')->find((int) $request->input('product_id'));
-        if (!$product || $product->variants->isEmpty()) return CommonHelper::responseError('Product not found');
+        if (!$product || $product->variants->isEmpty() || !$this->ownsProduct((int) $product->id)) return CommonHelper::responseError('Product not found');
         $color = trim((string) $request->input('color'));
         if ($color === '') return CommonHelper::responseError('Enter the colour');
         $bc = trim((string) $request->input('barcode', ''));
@@ -458,10 +515,35 @@ class ScanApiController extends ProductApisController
     }
 
     /** Save the manufacturer barcode on one colour (e.g. scanned later). */
+    /**
+     * Custom (Lebazone): make one of a colour's gallery photos its main photo. The two swap
+     * places (the old main photo moves into the gallery); no file is deleted. The product's own
+     * picture follows when it was this colour's main photo.
+     */
+    public function setMainPhoto(Request $request)
+    {
+        $v = ProductVariant::find((int) $request->input('variant_id'));
+        if (!$v || !$this->ownsProduct((int) $v->product_id)) return CommonHelper::responseError('Colour not found');
+        $img = \App\Models\ProductImages::where('product_variant_id', $v->id)->where('id', (int) $request->input('image_id'))->first();
+        if (!$img) return CommonHelper::responseError('Photo not found');
+        DB::transaction(function () use ($v, $img) {
+            $old = (string) $v->image;
+            $new = (string) $img->image;
+            $product = Product::find($v->product_id);
+            $productFollows = $product && ((string) $product->image === $old || (string) $product->image === ''
+                || (int) ProductVariant::where('product_id', $v->product_id)->orderBy('sort_order')->orderBy('id')->value('id') === (int) $v->id);
+            $v->image = $new;
+            $v->save();
+            if ($old !== '') { $img->image = $old; $img->save(); } else { $img->delete(); }
+            if ($productFollows) { $product->image = $new; $product->save(); }
+        });
+        return CommonHelper::responseWithData($this->payload((int) $v->product_id));
+    }
+
     public function setBarcode(Request $request)
     {
         $v = ProductVariant::find((int) $request->input('variant_id'));
-        if (!$v) return CommonHelper::responseError('Colour not found');
+        if (!$v || !$this->ownsProduct((int) $v->product_id)) return CommonHelper::responseError('Colour not found');
         $bc = trim((string) $request->input('barcode', ''));
         if ($bc !== '' && ProductVariant::where('barcode', $bc)->where('product_id', '!=', $v->product_id)->exists()) {
             return CommonHelper::responseError("Barcode $bc already belongs to another product");
@@ -476,7 +558,10 @@ class ScanApiController extends ProductApisController
     {
         $v = ProductVariant::find((int) $request->input('variant_id'));
         $shop = $this->shop();
-        if (!$v || !$shop) return CommonHelper::responseError('Colour not found');
+        if (!$v || !$shop || !$this->ownsProduct((int) $v->product_id)) return CommonHelper::responseError('Colour not found');
+        if ($this->currentSellerId() !== null && DB::table('products')->where('id', $v->product_id)->value('seller_review') !== 'pending') {
+            return CommonHelper::responseError('Stock of approved products is counted by Lebazone when your items arrive');
+        }
         $qty = (int) $request->input('qty', 1);
         $row = ProductVariantStoreStock::where('product_variant_id', $v->id)->where('store_id', $shop->id)->first();
         if (!$row) return CommonHelper::responseError('This colour has no stock record in the store');

@@ -460,6 +460,11 @@ export default {
                 return;
             }
 
+            // Custom (Lebazone): a seller's new product -> the Sellers page (approvals)
+            if (notification.data && notification.data.type === 'seller_product') {
+                this.$router.push('/sellers?approvals=1');
+                return;
+            }
             this.activeOrderId = notification.data.order_id;
             this.orderSliderShow = true;
         },

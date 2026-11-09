@@ -658,6 +658,11 @@
                                                             @click="removeKeptGalleryImage(vIdx, gIdx)">
                                                             <X :size="14" />
                                                         </button>
+                                                        <!-- Custom (Lebazone): swap with the main photo (saved at once) -->
+                                                        <button v-if="v.id && g.id && !v.image_file" type="button"
+                                                            class="btn btn-sm btn-light border position-absolute bottom-0 start-0 end-0 py-0"
+                                                            style="font-size: 11px;" title="Make this the main photo"
+                                                            @click="makeGalleryMain(vIdx, gIdx)">★ Main</button>
                                                     </div>
                                                     <div v-for="(p, pIdx) in v.gallery_previews" :key="'gp-' + pIdx"
                                                         class="position-relative">
@@ -2609,6 +2614,20 @@ export default {
                 v.gallery_files.push(f);
                 v.gallery_previews.push(URL.createObjectURL(f));
             }
+        },
+        // Custom (Lebazone): the gallery photo and the main photo swap places, saved straight away.
+        makeGalleryMain(vIdx, gIdx) {
+            const v = this.variants[vIdx];
+            const g = v && v.gallery_keep[gIdx];
+            if (!v || !g || !v.id || !g.id) return;
+            axios.post(this.$apiUrl + '/scan/set_main_photo', { variant_id: v.id, image_id: g.id }).then(r => {
+                if (r.data.status !== 1) return this.showError(r.data.message);
+                const oldUrl = v.image_url, oldPath = v.image_path;
+                v.image_url = g.url; v.image_preview = g.url; v.image_path = g.path; v.image_file = null;
+                if (oldPath) v.gallery_keep.splice(gIdx, 1, { id: g.id, url: oldUrl, path: oldPath });
+                else v.gallery_keep.splice(gIdx, 1);
+                this.showMessage('success', 'Main photo changed');
+            }).catch(e => this.showError(e?.response?.data?.message || e.message));
         },
         removeKeptGalleryImage(vIdx, gIdx) {
             const v = this.variants[vIdx];

@@ -36,7 +36,10 @@
                 <div>
                     <h5 class="mb-0">{{ p.name }}</h5>
                     <div class="text-muted small">{{ p.category }}<span v-if="p.brand"> · {{ p.brand }}</span>
-                        <span v-if="!p.status" class="badge bg-secondary ms-1">hidden</span></div>
+                        <span v-if="p.review === 'pending'" class="badge bg-warning text-dark ms-1">waiting for approval</span>
+                        <span v-else-if="p.review === 'rejected'" class="badge bg-danger ms-1">not approved</span>
+                        <span v-else-if="!p.status" class="badge bg-secondary ms-1">hidden</span></div>
+                    <div v-if="p.review === 'rejected' && p.review_note" class="small text-danger">Reason: {{ p.review_note }}</div>
                 </div>
                 <button class="btn btn-outline-secondary btn-sm" @click="openAddColor(p)">+ Add colour</button>
             </div>
@@ -59,6 +62,7 @@
                     <button class="btn btn-success" @click="receive(v, 1)">+1</button>
                     <button class="btn btn-outline-success" @click="receivePrompt(v)">+ …</button>
                     <button v-if="!v.barcode" class="btn btn-outline-primary" title="No barcode of its own - print Lebazone labels" @click="openPrint(p, v)">🏷 Labels</button>
+                    <button v-if="(v.gallery || []).length" class="btn btn-outline-secondary" @click="openPhotos(p, v)">📷 Photos</button>
                 </div>
             </div>
         </div></div>
@@ -97,6 +101,7 @@
                 <template v-if="form.barcode">Barcode <code>{{ form.barcode }}</code> - no labels needed ·
                     <a href="#" @click.prevent="switchToExisting">it's a new colour of a product I already have →</a></template>
                 <template v-else><b>No barcode</b> - Lebazone creates one and prints labels to stick on the items.</template></div>
+            <div v-if="isSeller" class="alert alert-info py-2 small">Your product goes on the shop after Lebazone checks and approves it. Enter your selling price - Lebazone's commission comes out of it.</div>
 
             <div class="d-flex gap-3 flex-wrap flex-md-nowrap">
                 <div class="flex-grow-1">
@@ -168,7 +173,7 @@
                     <div class="col-md-6 mb-2"><label class="form-label small">Brand</label>
                         <select v-model="form.brand_id" class="form-select"><option value="">—</option><option v-for="b in opts.brands" :key="b.id" :value="b.id">{{ b.name }}</option></select></div>
                     <div class="col-4 mb-2"><label class="form-label small">Sale price $</label><input v-model="form.sale_price" type="number" min="0" step="0.01" class="form-control" placeholder="none"></div>
-                    <div class="col-4 mb-2"><label class="form-label small">Cost $ (private)</label><input v-model="form.cost" type="number" min="0" step="0.01" class="form-control"></div>
+                    <div v-if="!isSeller" class="col-4 mb-2"><label class="form-label small">Cost $ (private)</label><input v-model="form.cost" type="number" min="0" step="0.01" class="form-control"></div>
                     <div class="col-4 mb-2"><label class="form-label small">Warranty</label>
                         <select v-model="form.warranty" class="form-select"><option v-for="w in warranties" :key="w" :value="w">{{ w }}</option></select></div>
                     <div class="col-12 mb-2"><label class="form-label small">Description</label><textarea v-model="form.description" rows="2" class="form-control" placeholder="Key specs, what's in the box"></textarea></div>
@@ -197,6 +202,19 @@
         </b-modal>
 
         <!-- Add colour to an existing product -->
+        <!-- Custom (Lebazone): choose a colour's main photo after it was added -->
+        <b-modal v-model="showPhotos" :title="'Photos · ' + (photosFor.v ? photosFor.v.color : '')" centered hide-footer @hidden="focusScan">
+            <template v-if="photosFor.v">
+                <p class="small text-muted mb-2">Tap a photo to make it the main photo (the one shown on the shop).</p>
+                <div class="sl-more-photos">
+                    <div class="sl-thumb main"><img :src="photosFor.v.image" alt=""><span class="sl-thumb-main">★ Main</span></div>
+                    <button v-for="g in photosFor.v.gallery" :key="g.id" type="button" class="sl-thumb p-0" :disabled="busy"
+                        :aria-label="'Make this photo the main photo'" @click="makeMainPhoto(g)">
+                        <img :src="g.url" alt=""><span class="sl-thumb-star">☆ Make main</span></button>
+                </div>
+            </template>
+        </b-modal>
+
         <b-modal v-model="showAddColor" title="Add a colour · لون جديد" centered @hidden="focusScan">
             <div v-if="!addColor.product">
                 <label class="form-label">Find the product</label>
@@ -325,7 +343,7 @@ export default {
             code: '', busy: false, receiveMode: false, products: [], recent: [], flash: null, SIZES, missing: { count: 0, products: [] },
             opts: { categories: [], brands: [], colors: [], app_name: 'Lebazone' },
             warranties: ['No warranty', '1 month', '3 months', '6 months', '1 year', '2 years'],
-            showNew: false, form: blankForm(), photoUrl: '', morePhotos: [], mainPhoto: 0, preparing: 0, catGuessed: false, catTouched: false, moreOpen: false,
+            showNew: false, form: blankForm(), photoUrl: '', morePhotos: [], mainPhoto: 0, preparing: 0, showPhotos: false, photosFor: { p: null, v: null }, catGuessed: false, catTouched: false, moreOpen: false,
             showAddColor: false, addColor: { product: null, color: '', barcode: '', stock: 1, price: '', sale_price: '', photo: null },
             searchTerm: '', searchResults: [],
             showPick: false, pick: { mode: 'label', title: '', question: '', variants: [], selected: null, product: null, copies: 1 },
@@ -334,6 +352,8 @@ export default {
     },
     computed: {
         topColors() { return (this.opts.colors || []).slice(0, 10); },
+        // Custom (Lebazone): a consignment seller's login - their products wait for Lebazone's approval
+        isSeller() { return this.$can('seller_portal'); },
         // Custom (Lebazone): labels are only needed for colours without their own barcode.
         newNeedsLabels() {
             const f = this.form;
@@ -402,6 +422,22 @@ export default {
             if (i < this.mainPhoto) this.mainPhoto--;
             else if (i === this.mainPhoto) this.mainPhoto = 0;
             if (this.mainPhoto >= this.morePhotos.length) this.mainPhoto = 0;
+        },
+        openPhotos(p, v) {
+            this.photosFor = { p, v };
+            this.showPhotos = true;
+        },
+        makeMainPhoto(g) {
+            const v = this.photosFor.v;
+            this.busy = true;
+            axios.post(this.$apiUrl + '/scan/set_main_photo', { variant_id: v.id, image_id: g.id }).then(r => {
+                if (r.data.status !== 1) return this.showError(r.data.message);
+                const p = r.data.data;
+                this.products = this.products.map(x => (x.id === p.id ? p : x));
+                this.photosFor = { p, v: p.variants.find(x => x.id === v.id) || null };
+                this.say(true, 'Main photo changed ✓');
+                this.loadRecent();
+            }).catch(this.fail).finally(() => { this.busy = false; });
         },
         clearMorePhotos() {
             this.mainPhoto = 0;

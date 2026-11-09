@@ -9,6 +9,7 @@ export function landingFor(user) {
     if (role === 'Order Station') return '/station';
     if (role === 'Packer') return '/warehouse?tab=station';
     if (role === 'Product entry') return '/scan';
+    if (role === 'Seller') return '/seller'; // Custom (Lebazone)
     if (role === 'Packer + products') return '/app';
     if (perms.includes('manage_dashboard')) return '/dashboard';
     return '/app';

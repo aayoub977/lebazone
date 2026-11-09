@@ -60,6 +60,7 @@ const AppHome = () => import("../views/App/AppHome.vue"); // Custom (Lebazone): 
 const OrderStation = () => import("../views/Warehouse/OrderStation.vue"); // Custom (Lebazone): touch-screen print station
 const AramexSettings = () => import("../views/Shipping/AramexSettings.vue"); // Custom (Hader)
 const Sellers = () => import("../views/Sellers/Sellers.vue"); // Custom (Hader)
+const SellerPortal = () => import("../views/Sellers/SellerPortal.vue"); // Custom (Lebazone)
 const Purchasing = () => import("../views/Purchasing/Purchasing.vue"); // Custom (Lebazone): import costing
 const SpinWheel = () => import("../views/SpinWheel/SpinWheel.vue");
 const SpinWheelForm = () => import("../views/SpinWheel/SpinWheelForm.vue");
@@ -260,6 +261,7 @@ const LANDING_ROUTES = [
     ['warehouse_pack', '/warehouse'],
     ['product_scan', '/scan'],
     ['warehouse_station', '/station'],
+    ['seller_portal', '/seller'],
 ];
 function firstAllowedRoute() {
     for (const [perm, path] of LANDING_ROUTES) {
@@ -729,6 +731,16 @@ function configRoutes() {
                         permission: 'promo_code_update',
                         role: adminRoles,
                         title: 'Edit Coupon'
+                    },
+                },
+                {
+                    path: "seller",
+                    name: "seller-portal",
+                    component: SellerPortal,
+                    meta: {
+                        permission: 'seller_portal',
+                        role: adminRoles,
+                        title: 'My shop'
                     },
                 },
                 {

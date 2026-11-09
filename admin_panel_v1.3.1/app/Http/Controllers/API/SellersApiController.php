@@ -49,6 +49,8 @@ class SellersApiController extends Controller
         $seller->fill($request->only(['business_name', 'contact_name', 'phone', 'email', 'city', 'category',
             'commission_percent', 'status', 'payout_details', 'admin_notes']));
         $seller->save();
+        // Custom (Lebazone): a seller's login works only while the seller is active
+        if (!empty($seller->admin_id)) DB::table('admins')->where('id', $seller->admin_id)->update(['status' => $seller->status === 'active' ? 1 : 0]);
         return CommonHelper::responseSuccess('Seller saved');
     }
 
@@ -59,12 +61,14 @@ class SellersApiController extends Controller
             return CommonHelper::responseError('Seller not found');
         }
         $rows = DB::table('seller_ledger')->where('seller_id', $id)->orderByDesc('id')->limit(300)->get();
-        $products = Product::where('seller_id', $id)->with('translations')->get(['id', 'name'])
-            ->map(fn ($p) => ['id' => $p->id, 'name' => (string) $p->name]);
+        $products = Product::where('seller_id', $id)->with('translations')->get(['id', 'name', 'seller_review'])
+            ->map(fn ($p) => ['id' => $p->id, 'name' => (string) $p->name, 'review' => (string) ($p->seller_review ?? '')]);
+        $login = $seller->admin_id ? DB::table('admins')->where('id', $seller->admin_id)->first(['email', 'status']) : null;
         return CommonHelper::responseWithData([
             'balance'  => round($seller->balance(), 2),
             'ledger'   => $rows,
             'products' => $products,
+            'login'    => $login ? ['email' => $login->email, 'active' => (int) $login->status === 1] : null,
         ]);
     }
 
@@ -98,6 +102,99 @@ class SellersApiController extends Controller
         }
         Product::whereIn('id', $ids)->update(['seller_id' => $sellerId ?: null]);
         return CommonHelper::responseSuccess($sellerId ? 'Products linked to seller' : 'Products unlinked');
+    }
+
+    // ---------------- Custom (Lebazone): seller logins + approving their products ----------------
+
+    /** Create (or change) the seller's panel login. The password is typed by the admin. */
+    public function saveLogin(Request $request)
+    {
+        $seller = Seller::find((int) $request->input('seller_id'));
+        if (!$seller) return CommonHelper::responseError('Seller not found');
+        $email = strtolower(trim((string) $request->input('email')));
+        $password = (string) $request->input('password', '');
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) return CommonHelper::responseError('Enter a valid email for the login');
+        $roleId = (int) DB::table('roles')->where('name', 'Seller')->where('guard_name', 'web')->value('id');
+        if (!$roleId) return CommonHelper::responseError('The Seller role is missing - run the update first');
+        $taken = DB::table('admins')->where('email', $email)->when($seller->admin_id, fn ($q) => $q->where('id', '!=', $seller->admin_id))->exists();
+        if ($taken) return CommonHelper::responseError('This email is already used by another login');
+        $admin = $seller->admin_id ? \App\Models\Admin::find($seller->admin_id) : null;
+        if (!$admin && strlen($password) < 8) return CommonHelper::responseError('Choose a password of at least 8 characters');
+        if ($admin && $password !== '' && strlen($password) < 8) return CommonHelper::responseError('Choose a password of at least 8 characters');
+        if (!$admin) {
+            $admin = new \App\Models\Admin();
+            $admin->created_by = (int) (auth('api')->id() ?? 1);
+        }
+        $admin->username = mb_substr($seller->business_name ?: $seller->contact_name, 0, 190);
+        $admin->email = $email;
+        $admin->role_id = $roleId;
+        if ($password !== '') $admin->password = bcrypt($password);
+        $admin->status = $request->has('active') ? ((int) $request->input('active') ? 1 : 0) : ($seller->status === 'active' ? 1 : 0);
+        $admin->save();
+        DB::table('sellers')->where('id', $seller->id)->update(['admin_id' => $admin->id]);
+        return CommonHelper::responseSuccess($password !== '' ? 'Seller login saved' : 'Seller login updated');
+    }
+
+    /** Products sellers added that wait for approval. */
+    public function pendingProducts()
+    {
+        $rows = Product::where('seller_review', 'pending')->with('translations')->orderBy('id')->limit(200)
+            ->get(['id', 'name', 'seller_id', 'seller_review'])
+            ->map(function ($p) {
+                $v = \App\Models\ProductVariant::where('product_id', $p->id)->orderBy('sort_order')->orderBy('id')->first();
+                $st = $v ? DB::table('product_variant_store_stocks')->where('product_variant_id', $v->id)->first() : null;
+                return ['id' => $p->id, 'name' => (string) $p->name,
+                    'seller' => (string) DB::table('sellers')->where('id', $p->seller_id)->value('business_name'),
+                    'image' => $v && $v->image ? asset('storage/' . $v->image) : '',
+                    'colors' => \App\Models\ProductVariant::where('product_id', $p->id)->count(),
+                    'price' => $st ? (float) $st->price : null, 'sale_price' => $st ? (float) $st->discounted_price : null,
+                    'stock' => (int) DB::table('product_variant_store_stocks')->whereIn('product_variant_id',
+                        \App\Models\ProductVariant::where('product_id', $p->id)->pluck('id'))->sum('available')];
+            });
+        return CommonHelper::responseWithData($rows);
+    }
+
+    /** Approve (goes live) or reject (stays hidden, the seller sees the reason). */
+    public function reviewProduct(Request $request)
+    {
+        $p = Product::find((int) $request->input('product_id'));
+        if (!$p || !$p->seller_id) return CommonHelper::responseError('Product not found');
+        if ($request->input('decision') === 'approve') {
+            DB::table('products')->where('id', $p->id)->update(['status' => 1, 'seller_review' => null, 'seller_review_note' => null]);
+            return CommonHelper::responseSuccess('Approved - the product is on the shop now');
+        }
+        DB::table('products')->where('id', $p->id)->update(['status' => 0, 'seller_review' => 'rejected',
+            'seller_review_note' => mb_substr(trim((string) $request->input('note')), 0, 250) ?: null]);
+        return CommonHelper::responseSuccess('Rejected - the seller sees it in their account');
+    }
+
+    /** The logged-in seller's own page: balance, sales, payouts, products. */
+    public function portal()
+    {
+        $u = auth('api')->user();
+        $seller = $u ? Seller::where('admin_id', $u->id)->first() : null;
+        if (!$seller) return CommonHelper::responseError('Your seller account is not set up yet - contact Lebazone');
+        $products = Product::where('seller_id', $seller->id)->with('translations')->orderByDesc('id')->limit(300)
+            ->get(['id', 'name', 'status', 'seller_review', 'seller_review_note'])
+            ->map(function ($p) {
+                $vids = \App\Models\ProductVariant::where('product_id', $p->id)->pluck('id');
+                $v = \App\Models\ProductVariant::where('product_id', $p->id)->orderBy('sort_order')->orderBy('id')->first();
+                $st = $v ? DB::table('product_variant_store_stocks')->where('product_variant_id', $v->id)->first() : null;
+                $state = $p->seller_review === 'pending' ? 'waiting' : ($p->seller_review === 'rejected' ? 'rejected' : ((int) $p->status === 1 ? 'live' : 'hidden'));
+                return ['id' => $p->id, 'name' => (string) $p->name, 'state' => $state, 'note' => (string) ($p->seller_review_note ?? ''),
+                    'image' => $v && $v->image ? asset('storage/' . $v->image) : '',
+                    'price' => $st ? (float) $st->discounted_price : null,
+                    'stock' => (int) DB::table('product_variant_store_stocks')->whereIn('product_variant_id', $vids)->sum('available')];
+            });
+        return CommonHelper::responseWithData([
+            'business_name' => $seller->business_name,
+            'commission_percent' => (float) $seller->commission_percent,
+            'status' => $seller->status,
+            'balance' => round($seller->balance(), 2),
+            'ledger' => DB::table('seller_ledger')->where('seller_id', $seller->id)->orderByDesc('id')->limit(100)
+                ->get(['id', 'type', 'gross', 'commission', 'net', 'note', 'created_at']),
+            'products' => $products,
+        ]);
     }
 
     /** Product picker search. */

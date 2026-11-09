@@ -282,6 +282,9 @@ Route::middleware(['auth:api', 'store.scope'])->group(function () {
         Route::get('report', [PurchasingApiController::class, 'report']);
     });
 
+    // Custom (Lebazone): the logged-in seller's own page
+    Route::get('seller_portal/summary', [SellersApiController::class, 'portal']);
+
     // Custom (Hader): consignment sellers
     Route::group(['prefix' => 'sellers'], function () {
         Route::get('/', [SellersApiController::class, 'index']);
@@ -290,6 +293,9 @@ Route::middleware(['auth:api', 'store.scope'])->group(function () {
         Route::post('save', [SellersApiController::class, 'save']);
         Route::post('payout', [SellersApiController::class, 'payout']);
         Route::post('assign_products', [SellersApiController::class, 'assignProducts']);
+        Route::post('save_login', [SellersApiController::class, 'saveLogin']); // Custom (Lebazone)
+        Route::get('pending_products', [SellersApiController::class, 'pendingProducts']);
+        Route::post('review_product', [SellersApiController::class, 'reviewProduct']);
     });
 
     // Custom (Hader): Aramex shipping
@@ -343,6 +349,7 @@ Route::middleware(['auth:api', 'store.scope'])->group(function () {
         Route::post('create', [ScanApiController::class, 'create']);
         Route::post('add_color', [ScanApiController::class, 'addColor']);
         Route::post('set_barcode', [ScanApiController::class, 'setBarcode']);
+        Route::post('set_main_photo', [ScanApiController::class, 'setMainPhoto']); // Custom (Lebazone)
         Route::post('receive', [ScanApiController::class, 'receive']);
         Route::post('set_size', [ScanApiController::class, 'setSize']);
         Route::get('missing_size', [ScanApiController::class, 'missingSize']);

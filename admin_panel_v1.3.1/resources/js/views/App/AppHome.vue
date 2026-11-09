@@ -53,6 +53,7 @@ import PasskeyCard from '../../components/PasskeyCard.vue';
 
 const MAIN = [
     { perm: 'warehouse_pack', url: '/warehouse?tab=station', label: 'Pack orders', ar: 'تجهيز الطلبات', icon: PackageCheck, color: '#DC2626', key: 'pack' },
+    { perm: 'seller_portal', url: '/seller', label: 'My shop', ar: 'متجري', icon: Package, color: '#DC2626' },
     { perm: 'product_scan', url: '/scan', label: 'Scan products', ar: 'مسح وإضافة المنتجات', icon: ScanBarcode, color: '#2563EB' },
     { perm: 'order_list', url: '/warehouse?tab=board', label: 'Orders board', ar: 'لوحة الطلبات', icon: ClipboardList, color: '#059669', key: 'board' },
     { perm: 'order_list', url: '/orders', label: 'All orders', ar: 'كل الطلبات', icon: ShoppingCart, color: '#D97706' },

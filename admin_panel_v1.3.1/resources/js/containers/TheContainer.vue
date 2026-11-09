@@ -456,6 +456,11 @@ export default {
                             permission: null,
                             submenu: [
                                 {
+                                    name: 'My shop',
+                                    url: '/seller',
+                                    permission: 'seller_portal',
+                                },
+                                {
                                     name: 'Scan products',
                                     url: '/scan',
                                     permission: 'product_scan',
@@ -826,6 +831,7 @@ export default {
         lbzQuick() {
             const all = [
                 { perm: 'warehouse_pack', url: '/warehouse?tab=station', label: 'Pack', icon: PackageCheck },
+                { perm: 'seller_portal', url: '/seller', label: 'My shop', icon: Package },
                 { perm: 'product_scan', url: '/scan', label: 'Scan', icon: ScanBarcode },
                 { perm: 'order_list', url: '/orders', label: 'Orders', icon: ShoppingCart },
                 { perm: 'product_list', url: '/products', label: 'Products', icon: Package },

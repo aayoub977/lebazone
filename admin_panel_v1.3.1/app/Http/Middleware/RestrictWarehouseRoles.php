@@ -12,7 +12,7 @@ use Illuminate\Http\Request;
  */
 class RestrictWarehouseRoles
 {
-    public const ROLES = ['Packer', 'Product entry', 'Packer + products', 'Order Station'];
+    public const ROLES = ['Packer', 'Product entry', 'Packer + products', 'Order Station', 'Seller'];
 
     /** Reads the panel shell needs for anyone who is logged in. */
     private const SHELL_GET = ['api/change_language', 'api/chat/unread_count', 'api/chat/poll', 'api/get_top_notifications', 'api/notification_read',
@@ -33,6 +33,7 @@ class RestrictWarehouseRoles
         $pack = in_array('warehouse_pack', $perms, true);
         $station = in_array('warehouse_station', $perms, true);
         $products = in_array('product_scan', $perms, true);
+        $seller = in_array('seller_portal', $perms, true); // Custom (Lebazone): sellers - ScanApiController limits them to their own products
         $read = $request->isMethod('GET') || $request->isMethod('HEAD');
 
         $ok = false;
@@ -41,6 +42,7 @@ class RestrictWarehouseRoles
                 || ($pack && $request->is('api/warehouse/board', 'api/warehouse/order', 'api/warehouse/queue', 'api/warehouse/me'))
                 || ($products && $request->is('api/scan/*'))
                 || ($station && $request->is('api/station/*'))
+                || ($seller && $request->is('api/seller_portal/*'))
                 || $request->is('api/warehouse/me');
         } else {
             $ok = $request->is(...self::SHELL_POST)

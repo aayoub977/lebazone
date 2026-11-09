@@ -6,6 +6,21 @@
                 <h3 class="page-head-title">Sellers</h3>
                 <button class="btn btn-primary list-add-btn ms-auto" @click="openSeller(null)">Add seller</button>
             </div>
+            <!-- Custom (Lebazone): products sellers added themselves wait here -->
+            <div v-if="pending.length" class="card mb-3 border-warning"><div class="card-body">
+                <h5 class="mb-1">Waiting for your approval ({{ pending.length }})</h5>
+                <p class="small text-muted">Added by sellers from their own login. Approve to put it on the shop, or reject with a reason they will see.</p>
+                <div v-for="p in pending" :key="'pp' + p.id" class="d-flex align-items-center gap-3 border-bottom py-2 flex-wrap">
+                    <img v-if="p.image" :src="p.image" alt="" style="width:56px;height:56px;object-fit:cover;border-radius:8px">
+                    <div class="flex-grow-1" style="min-width:180px">
+                        <div class="fw-semibold">{{ p.name }}</div>
+                        <div class="small text-muted">{{ p.seller }} · {{ p.colors }} colour(s) · {{ money(p.sale_price != null ? p.sale_price : p.price) }} · {{ p.stock }} pcs</div>
+                    </div>
+                    <a :href="'/products/edit/' + p.id" class="btn btn-sm btn-outline-secondary">Check / edit</a>
+                    <button class="btn btn-sm btn-success" :disabled="busy" @click="review(p, 'approve')">Approve</button>
+                    <button class="btn btn-sm btn-outline-danger" :disabled="busy" @click="review(p, 'reject')">Reject</button>
+                </div>
+            </div></div>
             <div class="list-surface p-3">
                 <p class="text-muted small">
                     Consignment sellers supply products that Lebazone stocks, sells and delivers. Applications from the website's
@@ -74,6 +89,20 @@
                             <button class="btn btn-outline-primary" @click="recordPayout" :disabled="busy">Record payout</button>
                         </div>
                     </div></div>
+                    <div class="card mb-3"><div class="card-body">
+                        <h5 class="mb-1">Seller login</h5>
+                        <p class="small text-muted mb-2">
+                            <template v-if="detail.login">Logs in at the admin panel with <b>{{ detail.login.email }}</b>
+                                <span v-if="!detail.login.active" class="text-danger">(off - the seller is not active)</span>.
+                                They add products from their phone and see only their own products, sales and balance.</template>
+                            <template v-else>Give the seller a login so they can add their products themselves. Their products go on the shop only after you approve them.</template>
+                        </p>
+                        <div class="row g-2">
+                            <div class="col-md-6"><input class="form-control" type="email" v-model="login.email" placeholder="Login email" autocomplete="off"></div>
+                            <div class="col-md-6"><input class="form-control" type="text" v-model="login.password" :placeholder="detail.login ? 'New password (leave empty to keep)' : 'Password (min 8)'" autocomplete="new-password"></div>
+                        </div>
+                        <button class="btn btn-outline-primary mt-2" :disabled="busy" @click="saveLogin">{{ detail.login ? 'Update login' : 'Create login' }}</button>
+                    </div></div>
                     <div class="card"><div class="card-body">
                         <h5>Products ({{ detail.products.length }})</h5>
                         <div class="input-group mb-2">
@@ -85,7 +114,10 @@
                             <button class="btn btn-sm btn-link" @click="link([p.id], form.id)" :disabled="p.seller_id === form.id">{{ p.seller_id === form.id ? 'Linked' : 'Link' }}</button>
                         </div>
                         <div v-for="p in detail.products" :key="'p' + p.id" class="d-flex justify-content-between border-bottom py-1 small">
-                            <span>{{ p.name }}</span><button class="btn btn-sm btn-link text-danger" @click="link([p.id], 0)">Unlink</button>
+                            <span>{{ p.name }}
+                                <span v-if="p.review === 'pending'" class="badge bg-warning text-dark ms-1">waiting for approval</span>
+                                <span v-else-if="p.review === 'rejected'" class="badge bg-danger ms-1">rejected</span></span>
+                            <button class="btn btn-sm btn-link text-danger" @click="link([p.id], 0)">Unlink</button>
                         </div>
                     </div></div>
                 </div>
@@ -117,12 +149,13 @@ import axios from 'axios';
 export default {
     data() {
         return { sellers: [], filter: '', current: null, form: {}, detail: { balance: 0, ledger: [], products: [] },
-            payout: { amount: '', note: '' }, search: '', results: [], busy: false };
+            payout: { amount: '', note: '' }, search: '', results: [], busy: false,
+            login: { email: '', password: '' }, pending: [] };
     },
     computed: {
         filtered() { return this.filter ? this.sellers.filter(s => s.status === this.filter) : this.sellers; },
     },
-    created() { this.load(); },
+    created() { this.load(); this.loadPending(); },
     methods: {
         money(v) { return '$' + Number(v || 0).toFixed(2); },
         badge(s) { return { pending: 'bg-warning text-dark', active: 'bg-success', suspended: 'bg-secondary', rejected: 'bg-light text-dark' }[s] || 'bg-light'; },
@@ -133,7 +166,25 @@ export default {
             this.detail = { balance: 0, ledger: [], products: [] };
             if (s) this.loadDetail();
         },
-        loadDetail() { axios.get(this.$apiUrl + '/sellers/ledger/' + this.form.id).then(r => { this.detail = r.data.data || this.detail; }); },
+        loadDetail() {
+            axios.get(this.$apiUrl + '/sellers/ledger/' + this.form.id).then(r => {
+                this.detail = r.data.data || this.detail;
+                this.login = { email: (this.detail.login && this.detail.login.email) || this.form.email || '', password: '' };
+            });
+        },
+        // Custom (Lebazone): seller logins + approvals
+        loadPending() { axios.get(this.$apiUrl + '/sellers/pending_products').then(r => { this.pending = r.data.data || []; }).catch(() => {}); },
+        saveLogin() {
+            this.post('/sellers/save_login', { seller_id: this.form.id, email: this.login.email, password: this.login.password }, () => { this.loadDetail(); });
+        },
+        review(p, decision) {
+            let note = '';
+            if (decision === 'reject') {
+                note = window.prompt('Why is "' + p.name + '" not approved? The seller will see this.', '');
+                if (note === null) return;
+            }
+            this.post('/sellers/review_product', { product_id: p.id, decision, note }, () => { this.loadPending(); this.load(); });
+        },
         post(url, data, after) {
             this.busy = true;
             const fd = new FormData(); for (const k in data) fd.append(k, data[k] ?? '');
