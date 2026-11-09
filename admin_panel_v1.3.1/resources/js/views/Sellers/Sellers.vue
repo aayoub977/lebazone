@@ -8,7 +8,11 @@
             </div>
             <!-- Custom (Lebazone): products sellers added themselves wait here -->
             <div v-if="pending.length" class="card mb-3 border-warning"><div class="card-body">
-                <h5 class="mb-1">Waiting for your approval ({{ pending.length }})</h5>
+                <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+                    <h5 class="mb-0">Waiting for your approval ({{ pending.length }})</h5>
+                    <button class="btn btn-sm ms-auto" :class="delAllArmed ? 'btn-danger' : 'btn-outline-danger'" :disabled="busy" @click="deleteAllPending">
+                        {{ delAllArmed ? 'Click again to delete all ' + pending.length : 'Delete all' }}</button>
+                </div>
                 <p class="small text-muted">Added by sellers from their own login. Approve to put it on the shop, or reject with a reason they will see.</p>
                 <div v-for="p in pending" :key="'pp' + p.id" class="d-flex align-items-center gap-3 border-bottom py-2 flex-wrap">
                     <img v-if="p.image" :src="p.image" alt="" style="width:56px;height:56px;object-fit:cover;border-radius:8px">
@@ -19,6 +23,7 @@
                     <a :href="'/products/edit/' + p.id" class="btn btn-sm btn-outline-secondary">Check / edit</a>
                     <button class="btn btn-sm btn-success" :disabled="busy" @click="review(p, 'approve')">Approve</button>
                     <button class="btn btn-sm btn-outline-danger" :disabled="busy" @click="review(p, 'reject')">Reject</button>
+                    <button class="btn btn-sm btn-link text-danger" :disabled="busy" @click="deletePending(p)" :aria-label="'Delete ' + p.name">Delete</button>
                 </div>
             </div></div>
             <div class="list-surface p-3">
@@ -154,7 +159,7 @@ export default {
     data() {
         return { sellers: [], filter: '', current: null, form: {}, detail: { balance: 0, ledger: [], products: [] },
             payout: { amount: '', note: '' }, search: '', results: [], busy: false,
-            login: { email: '', password: '' }, pending: [] };
+            login: { email: '', password: '' }, pending: [], delAllArmed: false };
     },
     computed: {
         filtered() { return this.filter ? this.sellers.filter(s => s.status === this.filter) : this.sellers; },
@@ -180,6 +185,15 @@ export default {
         loadPending() { axios.get(this.$apiUrl + '/sellers/pending_products').then(r => { this.pending = r.data.data || []; }).catch(() => {}); },
         saveLogin() {
             this.post('/sellers/save_login', { seller_id: this.form.id, email: this.login.email, password: this.login.password }, () => { this.loadDetail(); });
+        },
+        deleteAllPending() {
+            if (!this.delAllArmed) { this.delAllArmed = true; setTimeout(() => { this.delAllArmed = false; }, 4000); return; }
+            this.delAllArmed = false;
+            this.post('/sellers/delete_pending', { product_ids: this.pending.map(p => p.id).join(',') }, () => { this.loadPending(); this.load(); });
+        },
+        deletePending(p) {
+            if (!window.confirm('Delete "' + p.name + '"? This cannot be undone.')) return;
+            this.post('/sellers/delete_pending', { product_ids: String(p.id) }, () => { this.loadPending(); this.load(); });
         },
         review(p, decision) {
             let note = '';

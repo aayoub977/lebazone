@@ -166,6 +166,23 @@ class SellersApiController extends Controller
         return CommonHelper::responseWithData($rows);
     }
 
+    /** Custom (Lebazone): delete products that wait for approval (all of them, or the ids given). */
+    public function deletePending(Request $request)
+    {
+        $q = Product::where('seller_review', 'pending');
+        $ids = array_values(array_filter(array_map('intval', explode(',', (string) $request->input('product_ids', '')))));
+        if ($ids) $q->whereIn('id', $ids);
+        $n = 0;
+        foreach ($q->get(['id']) as $p) {
+            $vids = \App\Models\ProductVariant::where('product_id', $p->id)->pluck('id');
+            if ($vids->count() && DB::table('order_items')->whereIn('product_variant_id', $vids)->exists()) continue; // never ordered while hidden, but stay safe
+            \App\Models\ProductVariant::whereIn('id', $vids)->delete();
+            $p->delete();
+            $n++;
+        }
+        return CommonHelper::responseSuccess($n === 1 ? '1 product deleted' : "$n products deleted");
+    }
+
     /** Approve (goes live) or reject (stays hidden, the seller sees the reason). */
     public function reviewProduct(Request $request)
     {

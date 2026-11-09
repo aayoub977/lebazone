@@ -297,6 +297,7 @@ Route::middleware(['auth:api', 'store.scope'])->group(function () {
         Route::post('save_login', [SellersApiController::class, 'saveLogin']); // Custom (Lebazone)
         Route::get('pending_products', [SellersApiController::class, 'pendingProducts']);
         Route::post('review_product', [SellersApiController::class, 'reviewProduct']);
+        Route::post('delete_pending', [SellersApiController::class, 'deletePending']);
     });
 
     // Custom (Hader): Aramex shipping
