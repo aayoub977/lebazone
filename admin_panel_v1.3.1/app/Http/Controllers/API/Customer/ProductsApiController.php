@@ -1093,6 +1093,11 @@ class ProductsApiController extends Controller
         // Zone store name + delivery time (quick commerce only).
         $delivery = CustomerProductShaper::zoneDelivery($zone, $lat, $lng);
         $detail['store_name']      = $delivery['store_name'];
+        // Custom (Lebazone): a consignment seller's product shows the seller as "Sold by"
+        if (!empty($product->seller_id)) {
+            $sellerName = \Illuminate\Support\Facades\DB::table('sellers')->where('id', $product->seller_id)->where('status', 'active')->value('business_name');
+            if ($sellerName) $detail['store_name'] = $sellerName;
+        }
         $detail['time_to_deliver'] = $channel === 'quick'
             ? CustomerProductShaper::formatDeliveryTime((int) $delivery['time_to_deliver'])
             : '';
