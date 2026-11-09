@@ -126,6 +126,7 @@
 
             <!-- Custom (Lebazone): more photos (gallery) -->
             <label class="form-label fw-bold mt-3 mb-1">More photos · صور إضافية <span class="small text-muted fw-normal">— optional, up to 10</span></label>
+            <div v-if="preparing" class="small text-muted mb-1">Preparing photos…</div>
             <div class="sl-more-photos">
                 <div v-for="(m, i) in morePhotos" :key="m.url" class="sl-thumb">
                     <img :src="m.url" alt="">
@@ -191,7 +192,7 @@
                         <option value="50x30">50 × 30</option><option value="40x25">40 × 25</option><option value="58x40">58 × 40</option><option value="a4">A4 sheet</option>
                     </select></template></div>
                 <button class="btn btn-secondary" @click="showNew = false">Cancel</button>
-                <button class="btn btn-primary btn-lg" :disabled="busy" @click="saveNew">
+                <button class="btn btn-primary btn-lg" :disabled="busy || preparing > 0" @click="saveNew">
                     <template v-if="!newNeedsLabels">Save</template>
                     <template v-else>Save &amp; print {{ form.colors.length === 1 ? Math.max(1, +form.colors[0].stock || 0) + ' label(s)' : 'labels' }}</template>
                     <b-spinner v-if="busy" small /></button>
@@ -224,13 +225,13 @@
                 <div class="row g-2 mt-1">
                     <div class="col-6"><label class="form-label small">Box barcode</label><input v-model="addColor.barcode" class="form-control" @keydown.enter.prevent></div>
                     <div class="col-6"><label class="form-label small">Photo</label>
-                        <input type="file" accept="image/*" multiple class="form-control" @change="e => { addColor.photo = e.target.files[0] || null; addColor.photos = Array.from(e.target.files || []).slice(1, 11); }">
+                        <input type="file" accept="image/*" multiple class="form-control" @change="onColorPhotos">
                         <small class="text-muted">Pick one or several - the first is the main photo</small></div>
                 </div>
             </div>
             <template #footer>
                 <button class="btn btn-secondary" @click="showAddColor = false">Cancel</button>
-                <button class="btn btn-primary" :disabled="busy || !addColor.product" @click="saveColor">Save &amp; print labels</button>
+                <button class="btn btn-primary" :disabled="busy || preparing > 0 || !addColor.product" @click="saveColor">Save &amp; print labels</button>
             </template>
         </b-modal>
 
@@ -295,6 +296,29 @@ const HINTS = [
     [['tablet', 'ipad'], ['tablet']],
 ];
 const LAST_CAT = 'lbzLastCategory';
+
+// Custom (Lebazone): phone photos are 3-6 MB each - shown and uploaded at full size they make
+// the form stutter or the phone reload the page. Shrink to 1600 px JPEG first (turned upright).
+async function shrinkImage(file, max = 1600, quality = 0.85) {
+    try {
+        if (!file || !(file.type || '').startsWith('image/') || file.type === 'image/gif') return file;
+        let bmp;
+        try { bmp = await createImageBitmap(file, { imageOrientation: 'from-image' }); } catch (e) { bmp = await createImageBitmap(file); }
+        const k = Math.min(1, max / Math.max(bmp.width, bmp.height));
+        const w = Math.max(1, Math.round(bmp.width * k)), h = Math.max(1, Math.round(bmp.height * k));
+        const c = document.createElement('canvas');
+        c.width = w; c.height = h;
+        const ctx = c.getContext('2d');
+        ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h);
+        ctx.drawImage(bmp, 0, 0, w, h);
+        if (bmp.close) bmp.close();
+        const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', quality));
+        if (!blob) return file;
+        return new File([blob], (file.name || 'photo').replace(/\.[^.]+$/, '') + '.jpg', { type: 'image/jpeg' });
+    } catch (e) {
+        return file; // the server resizes it anyway
+    }
+}
 const store = { get: (k, d) => { try { return localStorage.getItem(k) || d; } catch (e) { return d; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} } };
 
 export default {
@@ -304,7 +328,7 @@ export default {
             code: '', busy: false, receiveMode: false, products: [], recent: [], flash: null, SIZES, missing: { count: 0, products: [] },
             opts: { categories: [], brands: [], colors: [], app_name: 'Lebazone' },
             warranties: ['No warranty', '1 month', '3 months', '6 months', '1 year', '2 years'],
-            showNew: false, form: blankForm(), photoUrl: '', morePhotos: [], catGuessed: false, catTouched: false, moreOpen: false,
+            showNew: false, form: blankForm(), photoUrl: '', morePhotos: [], preparing: 0, catGuessed: false, catTouched: false, moreOpen: false,
             showAddColor: false, addColor: { product: null, color: '', barcode: '', stock: 1, price: '', sale_price: '', photo: null },
             searchTerm: '', searchResults: [],
             showPick: false, pick: { mode: 'label', title: '', question: '', variants: [], selected: null, product: null, copies: 1 },
@@ -360,13 +384,18 @@ export default {
             return (window.CSS && CSS.supports && CSS.supports('color', k)) ? k : '#D1D5DB';
         },
         // Custom (Lebazone): extra photos for the product gallery
-        addMorePhotos(e) {
-            const files = Array.from(e.target.files || []).filter(f => (f.type || '').startsWith('image/'));
-            for (const f of files) {
-                if (this.morePhotos.length >= 10) break;
-                this.morePhotos.push({ file: f, url: URL.createObjectURL(f) });
-            }
+        async addMorePhotos(e) {
+            const files = Array.from(e.target.files || []).filter(f => (f.type || '').startsWith('image/'))
+                .slice(0, Math.max(0, 10 - this.morePhotos.length));
             e.target.value = '';
+            this.preparing++;
+            try {
+                for (const f of files) { // one at a time keeps memory low on the phone
+                    const small = await shrinkImage(f);
+                    if (this.morePhotos.length >= 10) break;
+                    this.morePhotos.push({ file: small, url: URL.createObjectURL(small) });
+                }
+            } finally { this.preparing--; }
         },
         removeMorePhoto(i) {
             const m = this.morePhotos[i];
@@ -377,11 +406,27 @@ export default {
             this.morePhotos.forEach(m => URL.revokeObjectURL(m.url));
             this.morePhotos = [];
         },
-        onPhoto(e) {
-            const f = e.target.files && e.target.files[0];
-            this.form.photo = f || null;
-            if (this.photoUrl) URL.revokeObjectURL(this.photoUrl);
-            this.photoUrl = f ? URL.createObjectURL(f) : '';
+        async onPhoto(e) {
+            const raw = e.target.files && e.target.files[0];
+            e.target.value = '';
+            if (!raw) return;
+            this.preparing++;
+            try {
+                const f = await shrinkImage(raw);
+                this.form.photo = f;
+                if (this.photoUrl) URL.revokeObjectURL(this.photoUrl);
+                this.photoUrl = URL.createObjectURL(f);
+            } finally { this.preparing--; }
+        },
+        async onColorPhotos(e) {
+            const files = Array.from(e.target.files || []).filter(f => (f.type || '').startsWith('image/')).slice(0, 11);
+            this.preparing++;
+            try {
+                const out = [];
+                for (const f of files) out.push(await shrinkImage(f));
+                this.addColor.photo = out[0] || null;
+                this.addColor.photos = out.slice(1);
+            } finally { this.preparing--; }
         },
         guessCategory() {
             if (this.catTouched) return;
