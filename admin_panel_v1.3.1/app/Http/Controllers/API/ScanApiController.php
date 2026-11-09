@@ -48,9 +48,26 @@ class ScanApiController extends ProductApisController
         return preg_match('#^https?://#', $path) ? $path : asset('storage/' . ltrim($path, '/'));
     }
 
+    /**
+     * Custom (Lebazone): the shop's colour attribute, whatever its link name ended up as
+     * (a deleted "Color" keeps the slug 'color', so a new one may be 'color-2').
+     */
+    private function findColorAttribute(): ?Attribute
+    {
+        return Attribute::where('slug', 'color')->first()
+            ?? Attribute::whereIn('slug', ['colour', 'colors', 'colours'])->first()
+            ?? Attribute::where('slug', 'like', 'color-%')->orderBy('id')->first()
+            ?? Attribute::whereIn(\Illuminate\Support\Facades\DB::raw('LOWER(name)'), ['color', 'colour'])->orderBy('id')->first();
+    }
+
     private function colorAttribute(): Attribute
     {
-        $attr = Attribute::where('slug', 'color')->first();
+        $attr = $this->findColorAttribute();
+        if (!$attr) {
+            // A deleted "Color" still holds the slug - bring it back instead of clashing with it.
+            $old = Attribute::onlyTrashed()->where('slug', 'color')->first();
+            if ($old) { $old->restore(); $old->status = 1; $old->save(); return $old; }
+        }
         if (!$attr) {
             $attr = new Attribute();
             $attr->name = 'Color';
@@ -147,7 +164,7 @@ class ScanApiController extends ProductApisController
         $product = Product::with(['variants'])->findOrFail($productId);
         [$en] = $this->langs();
         $shop = $this->shop();
-        $attr = Attribute::where('slug', 'color')->first();
+        $attr = $this->findColorAttribute();
         $variants = [];
         foreach ($product->variants->sortBy('sort_order') as $v) {
             $color = '';
@@ -192,7 +209,7 @@ class ScanApiController extends ProductApisController
             ->filter(fn ($c) => !Category::where('parent_id', $c->id)->exists())
             ->map(fn ($c) => ['id' => $c->id, 'name' => $c->name])->values();
         $brands = Brand::where('status', 1)->orderBy('name')->get(['id', 'name']);
-        $attr = Attribute::where('slug', 'color')->first();
+        $attr = $this->findColorAttribute();
         $colors = $attr ? AttributeValue::where('attribute_id', $attr->id)->orderBy('value')->pluck('value') : collect();
         $base = ['Black', 'White', 'Silver', 'Grey', 'Blue', 'Red', 'Green', 'Gold', 'Pink', 'Purple'];
         return CommonHelper::responseWithData([

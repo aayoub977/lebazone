@@ -20,9 +20,13 @@
                 <CameraScanner big @scan="c => { code = c; lookup(); }" />
             </div>
             <div class="text-muted small mt-2">
-                <template v-if="!receiveMode">New barcode → a short form opens, labels print when you save. Known barcode → the product opens below.</template>
+                <template v-if="!receiveMode">New barcode → a short form opens. Known barcode → the product opens below.
+                    Products with their own barcode need no labels.</template>
                 <template v-else>Each scan adds 1 to that colour's stock. Unknown barcodes are not added in this mode.</template>
             </div>
+            <!-- Custom (Lebazone): items without a barcode get a Lebazone one, printed on labels -->
+            <button v-if="!receiveMode" type="button" class="btn btn-outline-primary mt-2" @click="openNewNoBarcode">
+                🏷 Product has no barcode? Add it &amp; print Lebazone labels · منتج بدون باركود</button>
             <div v-if="flash" class="sl-flash mt-2" :class="flash.ok ? 'ok' : 'bad'">{{ flash.text }}</div>
         </div></div>
 
@@ -54,7 +58,7 @@
                 <div class="d-flex gap-1 flex-wrap justify-content-end">
                     <button class="btn btn-success" @click="receive(v, 1)">+1</button>
                     <button class="btn btn-outline-success" @click="receivePrompt(v)">+ …</button>
-                    <button class="btn btn-outline-primary" @click="openPrint(p, v)">🏷 Labels</button>
+                    <button v-if="!v.barcode" class="btn btn-outline-primary" title="No barcode of its own - print Lebazone labels" @click="openPrint(p, v)">🏷 Labels</button>
                 </div>
             </div>
         </div></div>
@@ -89,8 +93,10 @@
 
         <!-- ============ QUICK ADD ============ -->
         <b-modal v-model="showNew" title="New product · منتج جديد" size="lg" centered @hidden="focusScan" @shown="focusName">
-            <div class="small text-muted mb-3">Barcode <code>{{ form.barcode }}</code> ·
-                <a href="#" @click.prevent="switchToExisting">it's a new colour of a product I already have →</a></div>
+            <div class="small text-muted mb-3">
+                <template v-if="form.barcode">Barcode <code>{{ form.barcode }}</code> - no labels needed ·
+                    <a href="#" @click.prevent="switchToExisting">it's a new colour of a product I already have →</a></template>
+                <template v-else><b>No barcode</b> - Lebazone creates one and prints labels to stick on the items.</template></div>
 
             <div class="d-flex gap-3 flex-wrap flex-md-nowrap">
                 <label class="sl-photo" :class="{ has: photoUrl }">
@@ -163,13 +169,15 @@
             </details>
 
             <template #footer>
-                <div class="me-auto small text-muted">Label size:
+                <div class="me-auto small text-muted"><template v-if="newNeedsLabels">Label size:
                     <select v-model="labelSize" class="form-select form-select-sm d-inline-block w-auto">
                         <option value="50x30">50 × 30</option><option value="40x25">40 × 25</option><option value="58x40">58 × 40</option><option value="a4">A4 sheet</option>
-                    </select></div>
+                    </select></template></div>
                 <button class="btn btn-secondary" @click="showNew = false">Cancel</button>
                 <button class="btn btn-primary btn-lg" :disabled="busy" @click="saveNew">
-                    Save &amp; print {{ form.colors.length === 1 ? Math.max(1, +form.colors[0].stock || 0) + ' label(s)' : 'labels' }} <b-spinner v-if="busy" small /></button>
+                    <template v-if="!newNeedsLabels">Save</template>
+                    <template v-else>Save &amp; print {{ form.colors.length === 1 ? Math.max(1, +form.colors[0].stock || 0) + ' label(s)' : 'labels' }}</template>
+                    <b-spinner v-if="busy" small /></button>
             </template>
         </b-modal>
 
@@ -287,6 +295,12 @@ export default {
     },
     computed: {
         topColors() { return (this.opts.colors || []).slice(0, 10); },
+        // Custom (Lebazone): labels are only needed for colours without their own barcode.
+        newNeedsLabels() {
+            const f = this.form;
+            const extra = f.colors.slice(1).filter(c => (c.color || '').trim());
+            return !f.barcode || extra.some(c => !(c.barcode || '').trim());
+        },
     },
     watch: { labelSize(v) { store.set('lbzLabelSize', v); } },
     mounted() {
@@ -410,8 +424,12 @@ export default {
                 this.showNew = false;
                 this.products = [p];
                 this.loadRecent();
-                if (p.variants.length === 1) {
-                    const v = p.variants[0];
+                // Custom (Lebazone): only colours without their own barcode get Lebazone labels.
+                const need = p.variants.filter(v => !v.barcode);
+                if (!need.length) {
+                    this.say(true, 'Saved ✓ - it has its own barcode, no labels needed');
+                } else if (need.length === 1) {
+                    const v = need[0];
                     const n = Math.max(1, Math.min(500, +v.stock || 1));
                     printProductLabels(p, v, n, this.labelSize, this.opts.app_name);
                     this.say(true, 'Saved ✓ — printing ' + n + ' label(s) for ' + v.color);
@@ -453,7 +471,9 @@ export default {
                 this.products = [p];
                 this.loadRecent();
                 const v = p.variants.find(x => this.same(x.color, a.color));
-                if (v) {
+                if (v && v.barcode) {
+                    this.say(true, 'Colour added ✓ - it has its own barcode, no labels needed');
+                } else if (v) {
                     const n = Math.max(1, Math.min(500, +a.stock || 1));
                     printProductLabels(p, v, n, this.labelSize, this.opts.app_name);
                     this.say(true, 'Colour added ✓ — printing ' + n + ' label(s) for ' + v.color);
@@ -484,8 +504,19 @@ export default {
 
         // Labels: always confirm the colour (pre-selected when there is only one or the scanned one).
         openPrint(p, preselect = null) {
-            const selected = preselect || (p.variants.length === 1 ? p.variants[0] : (p.variants.find(v => v.matched) || null));
-            this.openPick('label', p, p.variants, 'Print labels', 'Which colour are the labels for?', selected);
+            const list = p.variants.filter(v => !v.barcode);
+            if (!list.length) return this.say(true, 'Every colour has its own barcode - no labels needed');
+            const selected = preselect || (list.length === 1 ? list[0] : (list.find(v => v.matched) || null));
+            this.openPick('label', p, list, 'Print labels', 'Which colour are the labels for?', selected);
+        },
+        // Custom (Lebazone): add a product that has no barcode - Lebazone labels are printed for it.
+        openNewNoBarcode() {
+            this.form = blankForm();
+            this.form.category_id = '';
+            this.catGuessed = false; this.catTouched = false; this.moreOpen = false;
+            if (this.photoUrl) URL.revokeObjectURL(this.photoUrl);
+            this.photoUrl = '';
+            this.showNew = true;
         },
         openPick(mode, product, variants, title, question, selected = null) {
             this.pick = { mode, title, question, variants, product, selected, copies: selected && selected.stock > 0 ? Math.min(selected.stock, 50) : 1 };
