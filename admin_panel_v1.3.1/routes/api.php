@@ -317,6 +317,7 @@ Route::middleware(['auth:api', 'store.scope'])->group(function () {
     Route::group(['prefix' => 'station'], function () {
         Route::get('orders', [WarehouseApiController::class, 'stationOrders']);
         Route::post('print', [WarehouseApiController::class, 'stationPrint']);
+        Route::post('remove', [WarehouseApiController::class, 'stationRemove']); // Custom (Lebazone)
         Route::get('jobs', [WarehouseApiController::class, 'stationJobs']);
         Route::post('jobs/done', [WarehouseApiController::class, 'stationJobsDone']);
     });

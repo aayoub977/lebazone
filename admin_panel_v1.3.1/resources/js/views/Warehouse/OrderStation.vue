@@ -102,6 +102,9 @@
                     <button class="btn btn-outline-dark flex-fill py-3" :disabled="busy" @click="reprint('boxes')">🏷 {{ boxes }} box label{{ boxes > 1 ? 's' : '' }} only</button>
                 </div>
                 <button class="btn btn-link w-100 mt-2" @click="sel = null">Cancel</button>
+                <button class="btn btn-sm w-100 mt-1" :class="removeArmed ? 'btn-danger' : 'btn-outline-danger'" :disabled="busy" @click="removeFromStation">
+                    {{ removeArmed ? 'Tap again to remove ' + sel.number + ' from the station' : 'Stuck order? Remove from station' }}
+                </button>
             </div>
         </div>
 
@@ -134,7 +137,7 @@ export default {
         if (q) mode = q;
         return {
             mode, orders: [], BUCKETS, filter: ['waiting', 'printed'], counts: { waiting: 0, printed: 0, packing: 0, stamp: 0, shelf: 0, ready: 0 }, pendingPrints: 0,
-            sel: null, boxes: 1, busy: false, printing: false, checking: false, toast: null, clock: '', lastPrinted: '', showSettings: false,
+            sel: null, boxes: 1, busy: false, removeArmed: false, printing: false, checking: false, toast: null, clock: '', lastPrinted: '', showSettings: false,
             appName: 'Lebazone', boxSizeVal: boxSize.get(), knownIds: null,
             modes: [{ key: 'all', label: 'Sheets + box labels' }, { key: 'sheets', label: 'Sheets only' }, { key: 'labels', label: 'Box labels only' }],
         };
@@ -191,6 +194,18 @@ export default {
                 this.sel = null; this.runJobs();
             }).catch(e => { soundError(); this.say(false, e?.response?.data?.message || e.message); })
               .finally(() => { this.busy = false; });
+        },
+        // Custom (Lebazone): hides a stuck order from the station; the order itself is untouched.
+        removeFromStation() {
+            if (!this.removeArmed) { this.removeArmed = true; setTimeout(() => { this.removeArmed = false; }, 4000); return; }
+            const o = this.sel;
+            this.busy = true;
+            axios.post(this.$apiUrl + '/station/remove', { order_id: o.id }).then(r => {
+                if (r.data.status !== 1) { soundError(); return this.say(false, r.data.message); }
+                this.say(true, o.number + ' removed from the station');
+                this.sel = null; this.load();
+            }).catch(e => { soundError(); this.say(false, e?.response?.data?.message || e.message); })
+              .finally(() => { this.busy = false; this.removeArmed = false; });
         },
         print() {
             const o = this.sel;

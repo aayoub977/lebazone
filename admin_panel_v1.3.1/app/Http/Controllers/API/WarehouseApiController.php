@@ -201,6 +201,7 @@ class WarehouseApiController extends Controller
         $user = DB::table('users')->where('id', $o->user_id)->first();
         $picked = json_decode((string) $f->picked, true) ?: [];
         $items = array_map(fn ($i) => $i + ['picked' => (int) ($picked[$i['id']] ?? 0)], $this->items($orderId));
+        if (!$items) return null; // Custom (Lebazone): every item cancelled or returned
         $staff = $this->staff($f->staff_id);
         $driver = $this->driver($f->driver_id);
         $country = DB::table('countries')->where('id', $o->country_id)->first();
@@ -271,6 +272,8 @@ class WarehouseApiController extends Controller
     {
         $ids = DB::table('orders')->whereIn('active_status', ['2', '3', '4', 2, 3, 4])
             ->where(function ($q) { if (Schema::hasColumn('orders', 'delivery_type')) $q->whereNull('delivery_type')->orWhere('delivery_type', '!=', 'pickup'); })
+            ->whereExists(function ($q) { $q->from('order_items')->whereColumn('order_items.order_id', 'orders.id')->whereIn('order_items.active_status', ['2', '3', '4', 2, 3, 4]); }) // Custom (Lebazone): nothing left to pack = not open
+            ->where(function ($q) { if (Schema::hasTable('order_fulfillments')) $q->whereNotIn('orders.id', DB::table('order_fulfillments')->where('stage', 'removed')->select('order_id')); })
             ->orderBy('id')->limit(300)->pluck('id');
         $today = DB::table('order_fulfillments')->where('stage', 'out')->where('handed_at', '>=', now()->startOfDay())->pluck('order_id');
         $list = [];
@@ -374,6 +377,8 @@ class WarehouseApiController extends Controller
         $mine = []; $waiting = []; $others = [];
         $ids = DB::table('orders')->whereIn('active_status', ['2', '3', 2, 3])
             ->where(function ($q) { if (Schema::hasColumn('orders', 'delivery_type')) $q->whereNull('delivery_type')->orWhere('delivery_type', '!=', 'pickup'); })
+            ->whereExists(function ($q) { $q->from('order_items')->whereColumn('order_items.order_id', 'orders.id')->whereIn('order_items.active_status', ['2', '3', '4', 2, 3, 4]); }) // Custom (Lebazone): nothing left to pack = not open
+            ->where(function ($q) { if (Schema::hasTable('order_fulfillments')) $q->whereNotIn('orders.id', DB::table('order_fulfillments')->where('stage', 'removed')->select('order_id')); })
             ->orderBy('id')->limit(200)->pluck('id');
         foreach ($ids as $id) {
             $d = $this->detail((int) $id);
@@ -695,6 +700,8 @@ class WarehouseApiController extends Controller
     {
         return DB::table('orders')->whereIn('active_status', ['2', '3', '4', 2, 3, 4])
             ->where(function ($q) { if (Schema::hasColumn('orders', 'delivery_type')) $q->whereNull('delivery_type')->orWhere('delivery_type', '!=', 'pickup'); })
+            ->whereExists(function ($q) { $q->from('order_items')->whereColumn('order_items.order_id', 'orders.id')->whereIn('order_items.active_status', ['2', '3', '4', 2, 3, 4]); }) // Custom (Lebazone): nothing left to pack = not open
+            ->where(function ($q) { if (Schema::hasTable('order_fulfillments')) $q->whereNotIn('orders.id', DB::table('order_fulfillments')->where('stage', 'removed')->select('order_id')); })
             ->orderBy('id')->limit(300)->pluck('id');
     }
 
@@ -724,6 +731,16 @@ class WarehouseApiController extends Controller
         usort($orders, fn ($a, $b) => ((int) !empty($a['printed_at'])) <=> ((int) !empty($b['printed_at'])) ?: $a['id'] <=> $b['id']);
         $pending = Schema::hasTable('print_jobs') ? DB::table('print_jobs')->where('status', 'pending')->count() : 0;
         return CommonHelper::responseWithData(['orders' => $orders, 'counts' => $counts, 'pending_prints' => $pending]);
+    }
+
+    /** Custom (Lebazone): take a stuck order off the Order Station / pack screens. The order itself is not changed or deleted. */
+    public function stationRemove(Request $request)
+    {
+        $id = (int) $request->input('order_id');
+        if (!$id || !DB::table('orders')->where('id', $id)->exists()) return CommonHelper::responseError('Order not found');
+        $this->fulfillment($id);
+        DB::table('order_fulfillments')->where('order_id', $id)->update(['stage' => 'removed', 'updated_at' => now()]);
+        return CommonHelper::responseSuccess('Removed from the Order Station');
     }
 
     /** Tap on the Order Station: print the sheet + the guessed number of box labels. */
