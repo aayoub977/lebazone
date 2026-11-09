@@ -268,6 +268,169 @@ class ScanApiController extends ProductApisController
         ]);
     }
 
+    // ---------------- Custom (Lebazone): Excel bulk upload ----------------
+
+    private const BULK_HEADERS = ['Name *', 'Price $ *', 'Sale price $', 'Quantity', 'Colour', 'Category *', 'Box size *', 'Box barcode', 'Photos', 'Arabic name', 'Description'];
+
+    /** Leaf categories (the ones products go in), as the scan screen lists them. */
+    private function leafCategories()
+    {
+        return Category::where('status', 1)->orderBy('row_order')->get(['id', 'name', 'parent_id'])
+            ->filter(fn ($c) => !Category::where('parent_id', $c->id)->exists())
+            ->map(fn ($c) => ['id' => (int) $c->id, 'name' => trim((string) $c->name)])->values();
+    }
+
+    /** Excel keeps long barcodes as numbers (6.95E+12) - turn them back into the digits. */
+    private function barcodeText($v): string
+    {
+        if (is_float($v) || is_int($v)) return number_format((float) $v, 0, '', '');
+        return preg_replace('/\.0+$/', '', trim((string) $v));
+    }
+
+    /** The sample sheet: how to type the products, with category and size dropdowns. */
+    public function bulkSample()
+    {
+        $book = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $sh = $book->getActiveSheet();
+        $sh->setTitle('Products');
+        $sh->fromArray(self::BULK_HEADERS, null, 'A1');
+        $cats = $this->leafCategories();
+        $c1 = $cats[0]['name'] ?? 'Your category';
+        $c2 = $cats[1]['name'] ?? $c1;
+        $sh->fromArray([
+            ['Anker PowerCore 20000mAh', 45, 39, 5, 'Black', $c1, 'M', '6953156206014', 'anker1.jpg, anker2.jpg', '', 'Fast charging power bank'],
+            ['Anker PowerCore 20000mAh', 45, 39, 3, 'White', $c1, 'M', '6953156206021', 'anker-white.jpg', '', ''],
+            ['USB-C cable 1m', 6, '', 20, '', $c2, 'S', '', 'cable.jpg', '', ''],
+        ], null, 'A2');
+        $sh->getStyle('A1:K1')->getFont()->setBold(true)->getColor()->setRGB('FFFFFF');
+        $sh->getStyle('A1:K1')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setRGB('DC2626');
+        $sh->getStyle('A2:K4')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setRGB('FEF2F2');
+        foreach (['A' => 32, 'B' => 11, 'C' => 13, 'D' => 10, 'E' => 12, 'F' => 26, 'G' => 11, 'H' => 18, 'I' => 34, 'J' => 24, 'K' => 36] as $col => $w) {
+            $sh->getColumnDimension($col)->setWidth($w);
+        }
+        // barcodes are text, or Excel turns 6953156206014 into 6.95E+12
+        $sh->getStyle('H2:H1000')->getNumberFormat()->setFormatCode(\PhpOffice\PhpSpreadsheet\Style\NumberFormat::FORMAT_TEXT);
+        $sh->setCellValueExplicit('H2', '6953156206014', \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+        $sh->setCellValueExplicit('H3', '6953156206021', \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+        $sh->freezePane('A2');
+        $sh->getComment('A2')->getText()->createTextRun('Example rows - replace or delete them');
+
+        // category list + dropdowns
+        $list = $book->createSheet();
+        $list->setTitle('Categories');
+        $list->setCellValue('A1', 'Categories (pick one in the Products sheet)');
+        $list->getStyle('A1')->getFont()->setBold(true);
+        foreach ($cats as $i => $c) $list->setCellValue('A' . ($i + 2), $c['name']);
+        $list->getColumnDimension('A')->setWidth(40);
+        $last = max(2, count($cats) + 1);
+        for ($r = 2; $r <= 1000; $r++) {
+            $v = $sh->getCell("F$r")->getDataValidation();
+            $v->setType(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::TYPE_LIST)->setAllowBlank(true)->setShowDropDown(true)
+                ->setShowErrorMessage(true)->setErrorTitle('Category')->setError('Pick a category from the list')
+                ->setFormula1("'Categories'!\$A\$2:\$A\$$last");
+            $z = $sh->getCell("G$r")->getDataValidation();
+            $z->setType(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::TYPE_LIST)->setAllowBlank(true)->setShowDropDown(true)
+                ->setShowErrorMessage(true)->setErrorTitle('Box size')->setError('S, M, L or XL')->setFormula1('"S,M,L,XL"');
+        }
+
+        // instructions
+        $how = $book->createSheet();
+        $how->setTitle('How to fill');
+        $lines = [
+            ['How to fill the Products sheet'],
+            [''],
+            ['• One row = one product (or one colour of a product).'],
+            ['• Same Name on several rows with different Colours = ONE product with those colours (see the Anker example).'],
+            ['• Name, Price, Category and Box size are required. Prices in $. Sale price is optional (leave empty = no sale).'],
+            ['• Quantity = how many pieces you have now. Empty = 0.'],
+            ['• Category: pick from the dropdown (list is in the Categories sheet).'],
+            ['• Box size: how big the item is when packed - S (cable, case, charger), M (power bank, earbuds, mouse), L (speaker, keyboard, router), XL (own box: monitor).'],
+            ['• Box barcode: the barcode printed on the product box, if it has one. Empty = Lebazone makes a code and you can print labels.'],
+            ['• Photos: the FILE NAMES of the photos, separated by commas, e.g.  anker1.jpg, anker2.jpg  - the first one is the main photo.'],
+            ['   When uploading, pick the Excel file AND all these photos together. Names must match the files (capital letters do not matter).'],
+            ['• Arabic name and Description are optional.'],
+            ['• Delete the 3 example rows before uploading.'],
+        ];
+        $how->fromArray($lines, null, 'A1');
+        $how->getStyle('A1')->getFont()->setBold(true)->setSize(14);
+        $how->getColumnDimension('A')->setWidth(120);
+        $book->setActiveSheetIndex(0);
+
+        $tmp = tempnam(sys_get_temp_dir(), 'lbz') . '.xlsx';
+        (new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($book))->save($tmp);
+        return response()->download($tmp, 'lebazone-products-sample.xlsx', [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ])->deleteFileAfterSend(true);
+    }
+
+    /** Read an uploaded sheet -> rows the screen previews (and then saves product by product). */
+    public function bulkParse(Request $request)
+    {
+        $file = $request->file('file');
+        if (!$file || !$file->isValid()) return CommonHelper::responseError('Choose the Excel file');
+        $ext = strtolower($file->getClientOriginalExtension());
+        if (!in_array($ext, ['xlsx', 'xls', 'csv'], true)) return CommonHelper::responseError('Upload an Excel file (.xlsx)');
+        try {
+            $book = \PhpOffice\PhpSpreadsheet\IOFactory::load($file->getRealPath());
+        } catch (\Throwable $e) {
+            return CommonHelper::responseError('Could not read this file - save it as .xlsx and try again');
+        }
+        $sh = $book->getSheetByName('Products') ?? $book->getSheet(0);
+        $data = $sh->toArray(null, true, false, false);
+        if (count($data) < 2) return CommonHelper::responseError('The sheet has no products');
+
+        // find columns by header text, so moved columns still work
+        $hdr = array_map(fn ($h) => strtolower(trim(preg_replace('/[^a-z ]/i', ' ', (string) $h))), $data[0]);
+        $find = function (array $words) use ($hdr) {
+            foreach ($hdr as $i => $h) foreach ($words as $w) if ($h !== '' && str_starts_with(preg_replace('/\s+/', ' ', $h), $w)) return $i;
+            return null;
+        };
+        $col = [
+            'name' => $find(['name']), 'price' => $find(['price']), 'sale' => $find(['sale price', 'sale']),
+            'qty' => $find(['quantity', 'qty', 'stock']), 'color' => $find(['colour', 'color']),
+            'cat' => $find(['category']), 'size' => $find(['box size', 'size']), 'barcode' => $find(['box barcode', 'barcode']),
+            'photos' => $find(['photos', 'photo', 'images']), 'ar' => $find(['arabic']), 'desc' => $find(['description']),
+        ];
+        if ($col['name'] === null || $col['price'] === null) return CommonHelper::responseError('Use the sample sheet - the Name and Price columns are missing');
+
+        $cats = $this->leafCategories();
+        $byName = [];
+        foreach ($cats as $c) $byName[mb_strtolower($c['name'])] = $c;
+        $cell = fn ($row, $k) => $col[$k] === null ? '' : trim((string) ($row[$col[$k]] ?? ''));
+        $num = function ($v) { $v = str_replace([',', '$', ' '], ['.', '', ''], (string) $v); return $v === '' ? '' : (is_numeric($v) ? (float) $v : null); };
+
+        $rows = [];
+        foreach (array_slice($data, 1) as $i => $row) {
+            $name = $cell($row, 'name');
+            if ($name === '' && implode('', array_map(fn ($x) => trim((string) $x), (array) $row)) === '') continue; // empty line
+            $errors = [];
+            $price = $num($cell($row, 'price'));
+            $sale = $num($cell($row, 'sale'));
+            $qty = $num($cell($row, 'qty'));
+            $catName = $cell($row, 'cat');
+            $cat = $byName[mb_strtolower($catName)] ?? null;
+            $size = strtoupper($cell($row, 'size'));
+            if ($name === '') $errors[] = 'Name is empty';
+            if (!is_float($price) || $price <= 0) $errors[] = 'Price is missing or not a number';
+            if ($sale === null) $errors[] = 'Sale price is not a number';
+            elseif (is_float($sale) && is_float($price) && $sale > $price) $errors[] = 'Sale price is higher than the price';
+            if ($qty === null) $errors[] = 'Quantity is not a number';
+            if (!$cat) $errors[] = $catName === '' ? 'Category is empty' : "Category \"$catName\" not found";
+            if (!in_array($size, self::SIZES, true)) $errors[] = 'Box size must be S, M, L or XL';
+            $photos = array_values(array_filter(array_map('trim', preg_split('/[,;\n]+/', $cell($row, 'photos')))));
+            $rows[] = [
+                'row' => $i + 2, 'name' => $name, 'name_ar' => $cell($row, 'ar'), 'description' => $cell($row, 'desc'),
+                'price' => is_float($price) ? $price : null, 'sale_price' => is_float($sale) ? $sale : null,
+                'stock' => is_float($qty) ? max(0, (int) $qty) : 0, 'color' => $cell($row, 'color'),
+                'category_id' => $cat['id'] ?? null, 'category' => $cat['name'] ?? $catName, 'size' => $size,
+                'barcode' => $this->barcodeText($col['barcode'] === null ? '' : ($row[$col['barcode']] ?? '')), 'photos' => $photos, 'errors' => $errors,
+            ];
+        }
+        if (!$rows) return CommonHelper::responseError('The sheet has no products');
+        if (count($rows) > 500) return CommonHelper::responseError('Up to 500 rows per file - split it into smaller files');
+        return CommonHelper::responseWithData(['rows' => $rows]);
+    }
+
     public function lookup(Request $request)
     {
         $code = trim((string) $request->input('code', ''));

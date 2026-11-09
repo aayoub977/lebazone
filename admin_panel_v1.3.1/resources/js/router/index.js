@@ -797,7 +797,7 @@ function configRoutes() {
                     meta: {
                         permission: 'product_scan',
                         role: adminRoles,
-                        title: 'Bulk add products'
+                        title: 'Bulk upload products'
                     },
                 },
                 {

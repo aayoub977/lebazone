@@ -353,6 +353,8 @@ Route::middleware(['auth:api', 'store.scope'])->group(function () {
         Route::post('receive', [ScanApiController::class, 'receive']);
         Route::post('set_size', [ScanApiController::class, 'setSize']);
         Route::get('missing_size', [ScanApiController::class, 'missingSize']);
+        Route::get('bulk_sample', [ScanApiController::class, 'bulkSample']); // Custom (Lebazone): Excel bulk upload
+        Route::post('bulk_parse', [ScanApiController::class, 'bulkParse']);
     });
 
     // Custom (Hader): loyalty programme settings

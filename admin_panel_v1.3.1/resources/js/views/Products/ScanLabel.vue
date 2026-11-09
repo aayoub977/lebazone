@@ -2,7 +2,7 @@
     <!-- Custom (Lebazone): scan a barcode -> quick add (photo, name, price, colour, quantity) -> labels print. -->
     <div class="sl">
         <div class="page-head flex-wrap gap-2"><h3 class="page-head-title mb-0">Scan products</h3>
-            <router-link to="/scan/bulk" class="btn btn-outline-primary ms-auto">🖼 Bulk add with photos</router-link></div>
+            <router-link to="/scan/bulk" class="btn btn-outline-primary ms-auto">📄 Bulk upload (Excel)</router-link></div>
 
         <!-- Mode -->
         <div class="sl-modes mb-3">

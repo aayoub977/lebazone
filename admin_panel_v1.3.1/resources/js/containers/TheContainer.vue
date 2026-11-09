@@ -466,7 +466,7 @@ export default {
                                     permission: 'product_scan',
                                 },
                                 {
-                                    name: 'Bulk add with photos',
+                                    name: 'Bulk upload (Excel)',
                                     url: '/scan/bulk',
                                     permission: 'product_scan',
                                 },
