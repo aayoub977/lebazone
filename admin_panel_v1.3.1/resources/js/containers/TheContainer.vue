@@ -466,6 +466,11 @@ export default {
                                     permission: 'product_scan',
                                 },
                                 {
+                                    name: 'Bulk add with photos',
+                                    url: '/scan/bulk',
+                                    permission: 'product_scan',
+                                },
+                                {
                                     name: __('add_product'),
                                     url: '/products/create',
                                     permission: 'product_create',

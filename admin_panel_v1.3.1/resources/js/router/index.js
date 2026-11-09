@@ -55,6 +55,7 @@ const PromoCode = () => import("../views/PromoCode/PromoCode.vue");
 const FlashSales = () => import("../views/FlashSale/FlashSales.vue"); // Custom (Hader)
 const LoyaltySettings = () => import("../views/Loyalty/LoyaltySettings.vue"); // Custom (Hader)
 const ScanLabel = () => import("../views/Products/ScanLabel.vue"); // Custom (Lebazone)
+const BulkAdd = () => import("../views/Products/BulkAdd.vue"); // Custom (Lebazone)
 const Warehouse = () => import("../views/Warehouse/Warehouse.vue"); // Custom (Lebazone)
 const AppHome = () => import("../views/App/AppHome.vue"); // Custom (Lebazone): role-based app home
 const OrderStation = () => import("../views/Warehouse/OrderStation.vue"); // Custom (Lebazone): touch-screen print station
@@ -787,6 +788,16 @@ function configRoutes() {
                         permission: 'warehouse_pack',
                         role: adminRoles,
                         title: 'Warehouse'
+                    },
+                },
+                {
+                    path: "scan/bulk",
+                    name: "scan-bulk",
+                    component: BulkAdd,
+                    meta: {
+                        permission: 'product_scan',
+                        role: adminRoles,
+                        title: 'Bulk add products'
                     },
                 },
                 {

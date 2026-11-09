@@ -6,7 +6,8 @@
                 <h3 class="page-head-title mb-0">{{ d.business_name || 'My shop' }}</h3>
                 <div class="small text-muted" v-if="loaded">Lebazone commission: {{ d.commission_percent }}% · you get the rest of each sale</div>
             </div>
-            <router-link to="/scan" class="btn btn-primary ms-auto">+ Add a product</router-link>
+            <router-link to="/scan/bulk" class="btn btn-outline-primary ms-auto">🖼 Add many at once</router-link>
+            <router-link to="/scan" class="btn btn-primary">+ Add a product</router-link>
         </div>
 
         <div v-if="error" class="alert alert-warning">{{ error }}</div>
