@@ -124,6 +124,23 @@
                 </div>
             </div>
 
+            <!-- Custom (Lebazone): more photos (gallery) -->
+            <label class="form-label fw-bold mt-3 mb-1">More photos · صور إضافية <span class="small text-muted fw-normal">— optional, up to 10</span></label>
+            <div class="sl-more-photos">
+                <div v-for="(m, i) in morePhotos" :key="m.url" class="sl-thumb">
+                    <img :src="m.url" alt="">
+                    <button type="button" class="sl-thumb-x" :aria-label="'Remove photo ' + (i + 1)" @click="removeMorePhoto(i)">×</button>
+                </div>
+                <label v-if="morePhotos.length < 10" class="sl-thumb sl-thumb-add">
+                    <span>📷 Camera</span>
+                    <input type="file" accept="image/*" capture="environment" hidden @change="addMorePhotos">
+                </label>
+                <label v-if="morePhotos.length < 10" class="sl-thumb sl-thumb-add">
+                    <span>🖼 Gallery<br><small>pick several</small></span>
+                    <input type="file" accept="image/*" multiple hidden @change="addMorePhotos">
+                </label>
+            </div>
+
             <label class="form-label fw-bold mt-3 mb-1">Colour · اللون</label>
             <datalist id="lbz-colors"><option v-for="c in opts.colors" :key="c" :value="c" /></datalist>
             <div class="sl-chips">
@@ -207,7 +224,8 @@
                 <div class="row g-2 mt-1">
                     <div class="col-6"><label class="form-label small">Box barcode</label><input v-model="addColor.barcode" class="form-control" @keydown.enter.prevent></div>
                     <div class="col-6"><label class="form-label small">Photo</label>
-                        <input type="file" accept="image/*" capture="environment" class="form-control" @change="e => addColor.photo = e.target.files[0]"></div>
+                        <input type="file" accept="image/*" multiple class="form-control" @change="e => { addColor.photo = e.target.files[0] || null; addColor.photos = Array.from(e.target.files || []).slice(1, 11); }">
+                        <small class="text-muted">Pick one or several - the first is the main photo</small></div>
                 </div>
             </div>
             <template #footer>
@@ -286,7 +304,7 @@ export default {
             code: '', busy: false, receiveMode: false, products: [], recent: [], flash: null, SIZES, missing: { count: 0, products: [] },
             opts: { categories: [], brands: [], colors: [], app_name: 'Lebazone' },
             warranties: ['No warranty', '1 month', '3 months', '6 months', '1 year', '2 years'],
-            showNew: false, form: blankForm(), photoUrl: '', catGuessed: false, catTouched: false, moreOpen: false,
+            showNew: false, form: blankForm(), photoUrl: '', morePhotos: [], catGuessed: false, catTouched: false, moreOpen: false,
             showAddColor: false, addColor: { product: null, color: '', barcode: '', stock: 1, price: '', sale_price: '', photo: null },
             searchTerm: '', searchResults: [],
             showPick: false, pick: { mode: 'label', title: '', question: '', variants: [], selected: null, product: null, copies: 1 },
@@ -341,6 +359,24 @@ export default {
             if (map[k]) return map[k];
             return (window.CSS && CSS.supports && CSS.supports('color', k)) ? k : '#D1D5DB';
         },
+        // Custom (Lebazone): extra photos for the product gallery
+        addMorePhotos(e) {
+            const files = Array.from(e.target.files || []).filter(f => (f.type || '').startsWith('image/'));
+            for (const f of files) {
+                if (this.morePhotos.length >= 10) break;
+                this.morePhotos.push({ file: f, url: URL.createObjectURL(f) });
+            }
+            e.target.value = '';
+        },
+        removeMorePhoto(i) {
+            const m = this.morePhotos[i];
+            if (m) URL.revokeObjectURL(m.url);
+            this.morePhotos.splice(i, 1);
+        },
+        clearMorePhotos() {
+            this.morePhotos.forEach(m => URL.revokeObjectURL(m.url));
+            this.morePhotos = [];
+        },
         onPhoto(e) {
             const f = e.target.files && e.target.files[0];
             this.form.photo = f || null;
@@ -389,7 +425,7 @@ export default {
                     this.form.category_id = '';
                     this.catGuessed = false; this.catTouched = false; this.moreOpen = false;
                     if (this.photoUrl) URL.revokeObjectURL(this.photoUrl);
-                    this.photoUrl = '';
+                    this.photoUrl = ''; this.clearMorePhotos();
                     this.guessCategory();
                     this.showNew = true;
                     return;
@@ -416,6 +452,7 @@ export default {
             ['name', 'name_ar', 'category_id', 'brand_id', 'price', 'sale_price', 'cost', 'warranty', 'description', 'size'].forEach(k => fd.append(k, f[k] ?? ''));
             fd.append('colors', JSON.stringify(colors));
             if (f.photo) fd.append('photo', f.photo);
+            this.morePhotos.forEach(m => fd.append('photos[]', m.file));
             this.busy = true;
             axios.post(this.$apiUrl + '/scan/create', fd).then(r => {
                 if (r.data.status !== 1) return this.showError(r.data.message);
@@ -463,6 +500,7 @@ export default {
             fd.append('product_id', a.product.id);
             ['color', 'barcode', 'stock', 'price', 'sale_price'].forEach(k => fd.append(k, a[k] ?? ''));
             if (a.photo) fd.append('photo', a.photo);
+            (a.photos || []).forEach(f => fd.append('photos[]', f));
             this.busy = true;
             axios.post(this.$apiUrl + '/scan/add_color', fd).then(r => {
                 if (r.data.status !== 1) return this.showError(r.data.message);
@@ -515,7 +553,7 @@ export default {
             this.form.category_id = '';
             this.catGuessed = false; this.catTouched = false; this.moreOpen = false;
             if (this.photoUrl) URL.revokeObjectURL(this.photoUrl);
-            this.photoUrl = '';
+            this.photoUrl = ''; this.clearMorePhotos();
             this.showNew = true;
         },
         openPick(mode, product, variants, title, question, selected = null) {
@@ -552,6 +590,11 @@ export default {
 .sl-photo { width: 150px; height: 150px; flex-shrink: 0; border: 2px dashed #D1D5DB; border-radius: 14px; display: flex; align-items: center;
     justify-content: center; text-align: center; cursor: pointer; background: #F9FAFB; font-weight: 700; color: #6B7280; overflow: hidden; }
 .sl-photo.has { border-style: solid; background: #fff; }
+.sl-more-photos { display: flex; flex-wrap: wrap; gap: 10px; }
+.sl-thumb { position: relative; width: 84px; height: 84px; border: 1px solid #D1D5DB; border-radius: 10px; overflow: hidden; background: #fff; margin: 0; }
+.sl-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.sl-thumb-x { position: absolute; top: 2px; right: 2px; width: 26px; height: 26px; border: 0; border-radius: 50%; background: rgba(17, 24, 39, .75); color: #fff; font-size: 16px; line-height: 1; }
+.sl-thumb-add { border-style: dashed; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 12px; color: #374151; cursor: pointer; }
 .sl-photo img { width: 100%; height: 100%; object-fit: contain; }
 .sl-sizes { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
 .sl-size { display: flex; flex-direction: column; align-items: center; padding: 10px 6px; border: 2px solid #E5E7EB; border-radius: 12px; background: #fff; }

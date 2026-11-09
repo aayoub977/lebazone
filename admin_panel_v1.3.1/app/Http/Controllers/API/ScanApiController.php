@@ -119,6 +119,17 @@ class ScanApiController extends ProductApisController
         return $code;
     }
 
+    /** Custom (Lebazone): extra photos sent as photos[] (up to 10), stored like the main one. */
+    private function storePhotos(Request $request, string $field = 'photos'): array
+    {
+        $out = [];
+        foreach (array_slice((array) $request->file($field, []), 0, 10) as $file) {
+            if (!$file || !$file->isValid() || !str_starts_with((string) $file->getMimeType(), 'image/')) continue;
+            $out[] = self::squarePhoto($file->getRealPath()) ?? $file->store('catalog/products', 'public');
+        }
+        return $out;
+    }
+
     private function storePhoto(Request $request, string $field): ?string
     {
         if (!$request->hasFile($field)) return null;
@@ -291,6 +302,8 @@ class ScanApiController extends ProductApisController
 
         [$en, $ar] = $this->langs();
         $photo = $this->storePhoto($request, 'photo');
+        $more = $this->storePhotos($request);
+        if (!$photo && $more) $photo = array_shift($more); // no main photo: the first extra one becomes it
         $warranty = trim((string) $request->input('warranty', ''));
         $desc = trim((string) $request->input('description', ''));
         $html = ($desc !== '' ? '<p>' . nl2br(e($desc)) . '</p>' : '<p>' . e($name) . '</p>')
@@ -311,7 +324,7 @@ class ScanApiController extends ProductApisController
             $qty = max(0, (int) ($c['stock'] ?? 0));
             $variants[] = [
                 'name' => $name, 'sku' => $code, 'translations' => $vTrans,
-                'image_path' => $colorPhoto, 'gallery_paths' => [],
+                'image_path' => $colorPhoto, 'gallery_paths' => $more,
                 'attribute_values' => [['attribute_id' => $attr->id, 'value_id' => $val->id]],
                 'store_stocks' => [[
                     'store_id' => $shop->id, 'is_listed' => 1, 'stock_status' => 1,
@@ -413,9 +426,14 @@ class ScanApiController extends ProductApisController
             $v->name = $first->name;
             $v->sku = $this->nextCode();
             $v->sort_order = (int) $product->variants->max('sort_order') + 1;
-            $v->image = $this->storePhoto($request, 'photo') ?: $first->image;
+            $more = $this->storePhotos($request);
+            $main = $this->storePhoto($request, 'photo') ?: array_shift($more);
+            $v->image = $main ?: $first->image;
             if (Schema::hasColumn('product_variants', 'barcode')) $v->barcode = $bc !== '' ? $bc : null;
             $v->save();
+            foreach ($more as $path) { // Custom (Lebazone): extra photos -> the colour's gallery
+                \App\Models\ProductImages::create(['product_id' => $product->id, 'product_variant_id' => $v->id, 'image' => $path]);
+            }
             foreach (DB::table('product_variant_translations')->where('product_variant_id', $first->id)->get() as $t) {
                 $v->saveTranslation((int) $t->language_id, ['name' => $t->name]);
             }
