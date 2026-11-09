@@ -1606,3 +1606,9 @@ export const submitSellerApplication = async (data: Record<string, string>): Pro
   const response = await api.post(apiEndPoints.sellerApplication, formData);
   return response.data;
 };
+
+// Custom (Lebazone): a consignment seller's store header (name, banner, about).
+export const getSellerStore = async (id: string | number): Promise<any> => {
+  const response = await api.get(apiEndPoints.sellerStore, { params: { id } });
+  return response.data;
+};

@@ -61,6 +61,7 @@ Route::group(['middleware' => ['auth.customer']], function () {
     Route::get('cart/recommendations', [CartApiController::class, 'getCartRecommendations']);
     Route::get('flash_sale', [CustomerFlashSaleApiController::class, 'current']); // Custom (Hader)
     Route::post('seller_application', [\App\Http\Controllers\SellerPublicController::class, 'apply']); // Custom (Hader)
+    Route::get('seller_store', [\App\Http\Controllers\API\SellersApiController::class, 'publicStore']); // Custom (Lebazone)
     Route::get('faqs', [BasicApiController::class, 'getFaqs']);
     Route::get('social_media', [BasicApiController::class, 'getSocialMedia']);
 

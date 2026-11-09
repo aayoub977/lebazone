@@ -89,6 +89,8 @@
                             <button class="btn btn-outline-primary" @click="recordPayout" :disabled="busy">Record payout</button>
                         </div>
                     </div></div>
+                    <SellerStoreEditor v-if="detail.store" :seller-id="form.id" title="Their store page" :about="detail.store.about"
+                        :banner="detail.store.banner" :url="detail.store.url" @saved="loadDetail" />
                     <div class="card mb-3"><div class="card-body">
                         <h5 class="mb-1">Seller login</h5>
                         <p class="small text-muted mb-2">
@@ -145,8 +147,10 @@
 
 <script>
 import axios from 'axios';
+import SellerStoreEditor from '../../components/SellerStoreEditor.vue';
 
 export default {
+    components: { SellerStoreEditor },
     data() {
         return { sellers: [], filter: '', current: null, form: {}, detail: { balance: 0, ledger: [], products: [] },
             payout: { amount: '', note: '' }, search: '', results: [], busy: false,

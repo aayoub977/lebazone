@@ -54,6 +54,7 @@ import {
 import { getProductTypeMeta } from "../productdetail/productType";
 import { useDebouncedQuantity } from "@/hooks/useDebouncedQuantity";
 import useZoneHref from "@/hooks/useZoneHref";
+import Link from "next/link";
 import useStoreClosed from "@/hooks/useStoreClosed";
 import FewLeftBadge from "../productcards/FewLeftBadge";
 import useCurrency from "@/hooks/useCurrency";
@@ -1361,9 +1362,16 @@ const ProductDetailModal = ({
                             <span className="shrink-0 whitespace-nowrap font-semibold">
                               {t("sold_by")} :
                             </span>
-                            <span className="text-gray-600 dark:text-zinc-300">
+                            {productDetails?.seller_id ? (
+                          // Custom (Lebazone): the seller's name opens their store page
+                          <Link href={`${zoneHref("/products")}?seller=${productDetails.seller_id}`} className="text-red-600 hover:underline font-medium">
+                            {productDetails?.store_name}
+                          </Link>
+                        ) : (
+                          <span className="text-gray-600 dark:text-zinc-300">
                               {productDetails?.store_name}
                             </span>
+                        )}
                           </div>
                         )}
                         {productDetails?.manufacturer && (

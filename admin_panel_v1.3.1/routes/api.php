@@ -284,6 +284,7 @@ Route::middleware(['auth:api', 'store.scope'])->group(function () {
 
     // Custom (Lebazone): the logged-in seller's own page
     Route::get('seller_portal/summary', [SellersApiController::class, 'portal']);
+    Route::post('seller_portal/store', [SellersApiController::class, 'saveStore']);
 
     // Custom (Hader): consignment sellers
     Route::group(['prefix' => 'sellers'], function () {

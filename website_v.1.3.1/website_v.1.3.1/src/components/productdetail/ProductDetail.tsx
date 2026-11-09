@@ -1610,9 +1610,16 @@ const ProductDetail = ({ initialProduct = null }: ProductDetailProps) => {
                         <span className="font-semibold whitespace-nowrap text-start">
                           {t("sold_by")} :
                         </span>
-                        <span className="text-gray-600 dark:text-zinc-300">
+                        {product?.seller_id ? (
+                          // Custom (Lebazone): the seller's name opens their store page
+                          <Link href={`${zoneHref("/products")}?seller=${product.seller_id}`} className="text-red-600 hover:underline font-medium">
+                            {product?.store_name}
+                          </Link>
+                        ) : (
+                          <span className="text-gray-600 dark:text-zinc-300">
                           {product?.store_name}
                         </span>
+                        )}
                       </div>
                     )}
                     {product?.manufacturer && (

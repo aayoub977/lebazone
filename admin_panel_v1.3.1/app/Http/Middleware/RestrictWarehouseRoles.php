@@ -48,7 +48,8 @@ class RestrictWarehouseRoles
             $ok = $request->is(...self::SHELL_POST)
                 || ($pack && $request->is('api/warehouse/scan', 'api/warehouse/pack', 'api/warehouse/reopen', 'api/warehouse/print'))
                 || ($station && $request->is('api/station/*', 'api/warehouse/print'))
-                || ($products && $request->is('api/scan/*'));
+                || ($products && $request->is('api/scan/*'))
+                || ($seller && $request->is('api/seller_portal/*'));
         }
         if (!$ok) return response()->json(['status' => 0, 'message' => 'Not allowed for your account'], 403);
         return $next($request);

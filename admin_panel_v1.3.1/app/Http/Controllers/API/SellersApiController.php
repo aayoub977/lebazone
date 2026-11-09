@@ -46,9 +46,20 @@ class SellersApiController extends Controller
         if (!$seller) {
             return CommonHelper::responseError('Seller not found');
         }
+        $wasActive = $seller->exists && $seller->status === 'active';
         $seller->fill($request->only(['business_name', 'contact_name', 'phone', 'email', 'city', 'category',
             'commission_percent', 'status', 'payout_details', 'admin_notes']));
         $seller->save();
+        // Custom (Lebazone): a seller that is not active has nothing on the shop. Their live products are
+        // hidden (marked 'seller_off') and come back by themselves when the seller is active again.
+        $isActive = $seller->status === 'active';
+        if ($wasActive && !$isActive) {
+            Product::where('seller_id', $seller->id)->where('status', 1)->whereNull('seller_review')
+                ->update(['status' => 0, 'seller_review' => 'seller_off']);
+        } elseif ($isActive) {
+            Product::where('seller_id', $seller->id)->where('seller_review', 'seller_off')
+                ->update(['status' => 1, 'seller_review' => null]);
+        }
         // Custom (Lebazone): a seller's login works only while the seller is active
         if (!empty($seller->admin_id)) DB::table('admins')->where('id', $seller->admin_id)->update(['status' => $seller->status === 'active' ? 1 : 0]);
         return CommonHelper::responseSuccess('Seller saved');
@@ -69,6 +80,7 @@ class SellersApiController extends Controller
             'ledger'   => $rows,
             'products' => $products,
             'login'    => $login ? ['email' => $login->email, 'active' => (int) $login->status === 1] : null,
+            'store'    => ['about' => (string) ($seller->store_about ?? ''), 'banner' => $seller->store_banner ? asset('storage/' . $seller->store_banner) : '', 'url' => self::storeUrl((int) $seller->id)],
         ]);
     }
 
@@ -160,8 +172,12 @@ class SellersApiController extends Controller
         $p = Product::find((int) $request->input('product_id'));
         if (!$p || !$p->seller_id) return CommonHelper::responseError('Product not found');
         if ($request->input('decision') === 'approve') {
-            DB::table('products')->where('id', $p->id)->update(['status' => 1, 'seller_review' => null, 'seller_review_note' => null]);
-            return CommonHelper::responseSuccess('Approved - the product is on the shop now');
+            $active = Seller::where('id', $p->seller_id)->value('status') === 'active';
+            DB::table('products')->where('id', $p->id)->update($active
+                ? ['status' => 1, 'seller_review' => null, 'seller_review_note' => null]
+                : ['status' => 0, 'seller_review' => 'seller_off', 'seller_review_note' => null]);
+            return CommonHelper::responseSuccess($active ? 'Approved - the product is on the shop now'
+                : 'Approved - it goes on the shop when the seller is active again');
         }
         DB::table('products')->where('id', $p->id)->update(['status' => 0, 'seller_review' => 'rejected',
             'seller_review_note' => mb_substr(trim((string) $request->input('note')), 0, 250) ?: null]);
@@ -180,13 +196,17 @@ class SellersApiController extends Controller
                 $vids = \App\Models\ProductVariant::where('product_id', $p->id)->pluck('id');
                 $v = \App\Models\ProductVariant::where('product_id', $p->id)->orderBy('sort_order')->orderBy('id')->first();
                 $st = $v ? DB::table('product_variant_store_stocks')->where('product_variant_id', $v->id)->first() : null;
-                $state = $p->seller_review === 'pending' ? 'waiting' : ($p->seller_review === 'rejected' ? 'rejected' : ((int) $p->status === 1 ? 'live' : 'hidden'));
+                $state = $p->seller_review === 'pending' ? 'waiting' : ($p->seller_review === 'rejected' ? 'rejected' : ($p->seller_review === 'seller_off' ? 'paused' : ((int) $p->status === 1 ? 'live' : 'hidden')));
                 return ['id' => $p->id, 'name' => (string) $p->name, 'state' => $state, 'note' => (string) ($p->seller_review_note ?? ''),
                     'image' => $v && $v->image ? asset('storage/' . $v->image) : '',
                     'price' => $st ? (float) $st->discounted_price : null,
                     'stock' => (int) DB::table('product_variant_store_stocks')->whereIn('product_variant_id', $vids)->sum('available')];
             });
         return CommonHelper::responseWithData([
+            'id' => (int) $seller->id,
+            'store_about' => (string) ($seller->store_about ?? ''),
+            'store_banner' => $seller->store_banner ? asset('storage/' . $seller->store_banner) : '',
+            'store_url' => self::storeUrl((int) $seller->id),
             'business_name' => $seller->business_name,
             'commission_percent' => (float) $seller->commission_percent,
             'status' => $seller->status,
@@ -195,6 +215,61 @@ class SellersApiController extends Controller
                 ->get(['id', 'type', 'gross', 'commission', 'net', 'note', 'created_at']),
             'products' => $products,
         ]);
+    }
+
+    /** Custom (Lebazone): public store header for the website - name, banner, about. */
+    public function publicStore(Request $request)
+    {
+        $s = Seller::where('id', (int) $request->input('id'))->where('status', 'active')->first();
+        if (!$s) return CommonHelper::responseError('Store not found');
+        return CommonHelper::responseWithData([
+            'id' => (int) $s->id,
+            'name' => (string) $s->business_name,
+            'city' => (string) ($s->city ?? ''),
+            'about' => (string) ($s->store_about ?? ''),
+            'banner' => $s->store_banner ? asset('storage/' . $s->store_banner) : '',
+            'products' => (int) Product::where('seller_id', $s->id)->where('status', 1)->count(),
+        ]);
+    }
+
+    /** Custom (Lebazone): the logged-in seller sets their store banner and about text. */
+    public function saveStore(Request $request)
+    {
+        $u = auth('api')->user();
+        $seller = $request->filled('seller_id') && !$this->isSellerLogin()
+            ? Seller::find((int) $request->input('seller_id'))            // admin editing a seller
+            : ($u ? Seller::where('admin_id', $u->id)->first() : null);   // the seller themselves
+        if (!$seller) return CommonHelper::responseError('Seller not found');
+        $about = trim((string) $request->input('about', ''));
+        if (mb_strlen($about) > 600) return CommonHelper::responseError('Keep the text under 600 characters');
+        $data = ['store_about' => $about !== '' ? $about : null];
+        if ($request->hasFile('banner')) {
+            $f = $request->file('banner');
+            if (!$f->isValid() || !str_starts_with((string) $f->getMimeType(), 'image/')) return CommonHelper::responseError('The banner must be a picture');
+            if ($f->getSize() > 6 * 1024 * 1024) return CommonHelper::responseError('The banner picture is too big (max 6 MB)');
+            $data['store_banner'] = $f->store('sellers/banners', 'public');
+        } elseif ($request->input('remove_banner') === '1') {
+            $data['store_banner'] = null;
+        }
+        DB::table('sellers')->where('id', $seller->id)->update($data);
+        return CommonHelper::responseSuccess('Store page saved');
+    }
+
+    /** Custom (Lebazone): the seller's store page on the website. */
+    public static function storeUrl(int $sellerId): string
+    {
+        $site = rtrim((string) \App\Models\Setting::get_value('website_url'), '/');
+        if ($site === '' || str_contains($site, 'localhost')) { // admin.lebazone.store -> lebazone.store
+            $site = rtrim(preg_replace('#//admin\.#', '//', (string) config('app.url')), '/');
+        }
+        $zone = (string) (DB::table('zones')->where('status', 1)->orderBy('id')->value('slug') ?: 'lebanon');
+        return $site . '/' . $zone . '/products?seller=' . $sellerId;
+    }
+
+    private function isSellerLogin(): bool
+    {
+        $u = auth('api')->user();
+        return $u && $u->role && $u->role->name === 'Seller';
     }
 
     /** Product picker search. */

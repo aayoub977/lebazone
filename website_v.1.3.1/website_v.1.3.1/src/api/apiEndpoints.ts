@@ -103,3 +103,4 @@ export const getFlashSale = "flash_sale";
 export const getLoyalty = "loyalty"; // Custom (Lebazone)
 export const redeemLoyalty = "loyalty/redeem"; // Custom (Lebazone)
 export const sellerApplication = "seller_application"; // Custom (Lebazone)
+export const sellerStore = "seller_store"; // Custom (Lebazone): seller store page header

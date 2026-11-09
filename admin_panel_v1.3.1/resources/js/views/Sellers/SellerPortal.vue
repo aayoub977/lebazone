@@ -30,6 +30,8 @@
                 </ol>
             </div></div>
 
+            <SellerStoreEditor title="My store page" :about="d.store_about || ''" :banner="d.store_banner || ''" :url="d.store_url || ''" @saved="load" />
+
             <div class="card mb-3"><div class="card-body">
                 <h5>My products</h5>
                 <div v-if="!d.products.length" class="text-muted small py-2">No products yet - tap <b>+ Add a product</b>.</div>
@@ -66,8 +68,10 @@
 
 <script>
 import axios from 'axios';
+import SellerStoreEditor from '../../components/SellerStoreEditor.vue';
 
 export default {
+    components: { SellerStoreEditor },
     data() {
         return { d: { products: [], ledger: [], balance: 0 }, loaded: false, error: '' };
     },
@@ -81,8 +85,8 @@ export default {
         },
         money(v) { return '$' + Number(v || 0).toFixed(2); },
         count(s) { return this.d.products.filter(p => p.state === s).length; },
-        label(s) { return { live: 'On the shop', waiting: 'Waiting for approval', rejected: 'Not approved', hidden: 'Hidden' }[s] || s; },
-        badge(s) { return { live: 'bg-success', waiting: 'bg-warning text-dark', rejected: 'bg-danger', hidden: 'bg-secondary' }[s] || 'bg-light text-dark'; },
+        label(s) { return { live: 'On the shop', waiting: 'Waiting for approval', rejected: 'Not approved', hidden: 'Hidden', paused: 'Paused - account not active' }[s] || s; },
+        badge(s) { return { live: 'bg-success', waiting: 'bg-warning text-dark', rejected: 'bg-danger', hidden: 'bg-secondary', paused: 'bg-secondary' }[s] || 'bg-light text-dark'; },
     },
 };
 </script>

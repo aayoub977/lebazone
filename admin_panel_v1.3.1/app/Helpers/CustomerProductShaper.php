@@ -107,6 +107,20 @@ class CustomerProductShaper
         self::$notifyRequestedVariantIds = array_map('intval', $ids);
     }
 
+    /** Custom (Lebazone): active consignment sellers, id => business name (one query per request). */
+    private static ?array $activeSellers = null;
+
+    public static function sellerName($sellerId): ?string
+    {
+        if (!$sellerId) return null;
+        if (self::$activeSellers === null) {
+            self::$activeSellers = \Illuminate\Support\Facades\Schema::hasTable('sellers')
+                ? \Illuminate\Support\Facades\DB::table('sellers')->where('status', 'active')->pluck('business_name', 'id')->map(fn ($n) => (string) $n)->all()
+                : [];
+        }
+        return self::$activeSellers[(int) $sellerId] ?? null;
+    }
+
     public static function shapeCard(Product $p, array $favoriteIds, int $timeToDeliver = 0, ?string $storeName = null, ?array $currency = null, ?int $representativeVariantId = null): array
     {
         // Price is per-store (PVSS). storeStocks is eager-loaded already scoped to the
@@ -214,7 +228,8 @@ class CustomerProductShaper
             'price'              => $price,
             'discounted_price'   => $discountedPrice,
             'stock'              => $defaultStock,
-            'store_name'         => $storeName,
+            'store_name'         => self::sellerName($p->seller_id ?? null) ?? $storeName, // Custom (Lebazone): seller's name on their products
+            'seller_id'          => self::sellerName($p->seller_id ?? null) ? (int) $p->seller_id : null,
             'time_to_deliver'    => self::formatDeliveryTime($timeToDeliver),
             'currency'           => $currency['currency'] ?? null,
             'currency_code'      => $currency['currency_code'] ?? null,
@@ -331,7 +346,8 @@ class CustomerProductShaper
             'discounted_price'   => $discountedPrice,
             'slab_discount_message' => $slabDiscountMessage,
             'stock'              => $stock,
-            'store_name'         => $storeName,
+            'store_name'         => self::sellerName($p->seller_id ?? null) ?? $storeName, // Custom (Lebazone): seller's name on their products
+            'seller_id'          => self::sellerName($p->seller_id ?? null) ? (int) $p->seller_id : null,
             'time_to_deliver'    => self::formatDeliveryTime($timeToDeliver),
             'currency'           => $currency['currency'] ?? null,
             'currency_code'      => $currency['currency_code'] ?? null,

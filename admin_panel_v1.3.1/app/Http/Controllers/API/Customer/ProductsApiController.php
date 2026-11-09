@@ -131,6 +131,10 @@ class ProductsApiController extends Controller
                 $query->whereIn('brand_id', $ids);
             }
         }
+        // Custom (Lebazone): a consignment seller's store page lists only their products
+        if ($request->filled('seller_id') && \Illuminate\Support\Facades\Schema::hasColumn('products', 'seller_id')) {
+            $query->where('seller_id', (int) $request->input('seller_id'));
+        }
         // made_in is free text now (not a country id) — no country-id filter.
         if ($request->filled('slug')) {
             $query->where('slug', $request->slug);
@@ -1096,7 +1100,7 @@ class ProductsApiController extends Controller
         // Custom (Lebazone): a consignment seller's product shows the seller as "Sold by"
         if (!empty($product->seller_id)) {
             $sellerName = \Illuminate\Support\Facades\DB::table('sellers')->where('id', $product->seller_id)->where('status', 'active')->value('business_name');
-            if ($sellerName) $detail['store_name'] = $sellerName;
+            if ($sellerName) { $detail['store_name'] = $sellerName; $detail['seller_id'] = (int) $product->seller_id; }
         }
         $detail['time_to_deliver'] = $channel === 'quick'
             ? CustomerProductShaper::formatDeliveryTime((int) $delivery['time_to_deliver'])
