@@ -99,11 +99,6 @@
                 <template v-else><b>No barcode</b> - Lebazone creates one and prints labels to stick on the items.</template></div>
 
             <div class="d-flex gap-3 flex-wrap flex-md-nowrap">
-                <label class="sl-photo" :class="{ has: photoUrl }">
-                    <img v-if="photoUrl" :src="photoUrl" alt="">
-                    <span v-else>📷<br>Take photo<br><small>صورة</small></span>
-                    <input type="file" accept="image/*" capture="environment" hidden @change="onPhoto">
-                </label>
                 <div class="flex-grow-1">
                     <label class="form-label fw-bold mb-1">Name · الاسم *</label>
                     <input ref="qName" v-model="form.name" class="form-control form-control-lg" placeholder="e.g. Anker PowerCore 20000mAh" @input="guessCategory">
@@ -125,12 +120,14 @@
             </div>
 
             <!-- Custom (Lebazone): more photos (gallery) -->
-            <label class="form-label fw-bold mt-3 mb-1">More photos · صور إضافية <span class="small text-muted fw-normal">— optional, up to 10</span></label>
+            <label class="form-label fw-bold mt-3 mb-1">Photos · الصور <span class="small text-muted fw-normal">— up to 10; tap ☆ to choose the main photo</span></label>
             <div v-if="preparing" class="small text-muted mb-1">Preparing photos…</div>
             <div class="sl-more-photos">
-                <div v-for="(m, i) in morePhotos" :key="m.url" class="sl-thumb">
+                <div v-for="(m, i) in morePhotos" :key="m.url" class="sl-thumb" :class="{ main: i === mainPhoto }">
                     <img :src="m.url" alt="">
                     <button type="button" class="sl-thumb-x" :aria-label="'Remove photo ' + (i + 1)" @click="removeMorePhoto(i)">×</button>
+                    <span v-if="i === mainPhoto" class="sl-thumb-main">★ Main</span>
+                    <button v-else type="button" class="sl-thumb-star" :aria-label="'Make photo ' + (i + 1) + ' the main photo'" @click="mainPhoto = i">☆ Main</button>
                 </div>
                 <label v-if="morePhotos.length < 10" class="sl-thumb sl-thumb-add">
                     <span>📷 Camera</span>
@@ -328,7 +325,7 @@ export default {
             code: '', busy: false, receiveMode: false, products: [], recent: [], flash: null, SIZES, missing: { count: 0, products: [] },
             opts: { categories: [], brands: [], colors: [], app_name: 'Lebazone' },
             warranties: ['No warranty', '1 month', '3 months', '6 months', '1 year', '2 years'],
-            showNew: false, form: blankForm(), photoUrl: '', morePhotos: [], preparing: 0, catGuessed: false, catTouched: false, moreOpen: false,
+            showNew: false, form: blankForm(), photoUrl: '', morePhotos: [], mainPhoto: 0, preparing: 0, catGuessed: false, catTouched: false, moreOpen: false,
             showAddColor: false, addColor: { product: null, color: '', barcode: '', stock: 1, price: '', sale_price: '', photo: null },
             searchTerm: '', searchResults: [],
             showPick: false, pick: { mode: 'label', title: '', question: '', variants: [], selected: null, product: null, copies: 1 },
@@ -401,8 +398,13 @@ export default {
             const m = this.morePhotos[i];
             if (m) URL.revokeObjectURL(m.url);
             this.morePhotos.splice(i, 1);
+            // keep the same photo as main; if the main one was removed, the first becomes main
+            if (i < this.mainPhoto) this.mainPhoto--;
+            else if (i === this.mainPhoto) this.mainPhoto = 0;
+            if (this.mainPhoto >= this.morePhotos.length) this.mainPhoto = 0;
         },
         clearMorePhotos() {
+            this.mainPhoto = 0;
             this.morePhotos.forEach(m => URL.revokeObjectURL(m.url));
             this.morePhotos = [];
         },
@@ -496,8 +498,8 @@ export default {
             const fd = new FormData();
             ['name', 'name_ar', 'category_id', 'brand_id', 'price', 'sale_price', 'cost', 'warranty', 'description', 'size'].forEach(k => fd.append(k, f[k] ?? ''));
             fd.append('colors', JSON.stringify(colors));
-            if (f.photo) fd.append('photo', f.photo);
-            this.morePhotos.forEach(m => fd.append('photos[]', m.file));
+            // the photo marked ★ Main is the product picture, the others its gallery
+            this.morePhotos.forEach((m, i) => fd.append(i === this.mainPhoto ? 'photo' : 'photos[]', m.file));
             this.busy = true;
             axios.post(this.$apiUrl + '/scan/create', fd).then(r => {
                 if (r.data.status !== 1) return this.showError(r.data.message);
@@ -636,8 +638,12 @@ export default {
     justify-content: center; text-align: center; cursor: pointer; background: #F9FAFB; font-weight: 700; color: #6B7280; overflow: hidden; }
 .sl-photo.has { border-style: solid; background: #fff; }
 .sl-more-photos { display: flex; flex-wrap: wrap; gap: 10px; }
-.sl-thumb { position: relative; width: 84px; height: 84px; border: 1px solid #D1D5DB; border-radius: 10px; overflow: hidden; background: #fff; margin: 0; }
+.sl-thumb { position: relative; width: 96px; height: 96px; border: 1px solid #D1D5DB; border-radius: 10px; overflow: hidden; background: #fff; margin: 0; }
 .sl-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.sl-thumb.main { border: 3px solid #DC2626; }
+.sl-thumb-main, .sl-thumb-star { position: absolute; left: 0; right: 0; bottom: 0; border: 0; padding: 3px 0; font-size: 11px; font-weight: 700; text-align: center; }
+.sl-thumb-main { background: #DC2626; color: #fff; }
+.sl-thumb-star { background: rgba(255, 255, 255, .9); color: #111827; }
 .sl-thumb-x { position: absolute; top: 2px; right: 2px; width: 26px; height: 26px; border: 0; border-radius: 50%; background: rgba(17, 24, 39, .75); color: #fff; font-size: 16px; line-height: 1; }
 .sl-thumb-add { border-style: dashed; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 12px; color: #374151; cursor: pointer; }
 .sl-photo img { width: 100%; height: 100%; object-fit: contain; }
