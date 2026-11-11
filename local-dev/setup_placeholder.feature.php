@@ -7,7 +7,7 @@ $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
 
 use Illuminate\Support\Facades\DB;
 
-$rel = 'front_end/placeholder_image/lebazone-no-photo.png';
+$rel = 'front_end/placeholder_image/lebazone-no-photo-v2.png';
 $dest = $base . '/storage/app/public/' . $rel;
 @mkdir(dirname($dest), 0777, true);
 copy(__DIR__ . '/brand-assets/brand/lebazone-no-photo.png', $dest);

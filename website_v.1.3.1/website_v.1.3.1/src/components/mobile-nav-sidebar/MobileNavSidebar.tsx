@@ -53,7 +53,15 @@ const MobileNavSidebar = ({ open, setOpen, handleLanguageChange }: MobileNavSide
                 fill
                 sizes="144px"
                 priority
-                className="object-contain"
+                className="object-contain dark:hidden"
+              />
+              {/* Custom (Lebazone): white-letter logo on the dark theme */}
+              <Image
+                src="/lebazone-logo-white.png"
+                alt="mobileLogo"
+                fill
+                sizes="144px"
+                className="object-contain hidden dark:block"
               />
             </div>
             <SheetTrigger className="focus:outline-none closeButtonBg rounded-full p-[8px]">

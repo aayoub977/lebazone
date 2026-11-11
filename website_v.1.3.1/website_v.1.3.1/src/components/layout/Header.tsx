@@ -1071,7 +1071,18 @@ const Header = () => {
                       priority={true}
                       fetchPriority="high"
                       loading="eager"
-                      className="object-contain"
+                      className="object-contain dark:hidden"
+                    />
+                  )}
+                  {/* Custom (Lebazone): the logo's black letters vanish on the dark theme,
+                      so dark mode shows the white-letter version instead. */}
+                  {mounted && setting?.setting?.web_settings?.web_logo && (
+                    <Image
+                      src="/lebazone-logo-white.png"
+                      alt="Logo"
+                      fill
+                      sizes="140px"
+                      className="object-contain hidden dark:block"
                     />
                   )}
                 </Link>
