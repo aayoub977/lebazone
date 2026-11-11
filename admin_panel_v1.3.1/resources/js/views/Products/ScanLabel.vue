@@ -79,6 +79,27 @@
             </div>
         </div></div>
 
+        <!-- Custom (Lebazone): products (e.g. added from the admin panel) whose colours have no box barcode yet -->
+        <div v-if="!receiveMode && (nob.count || nob.q)" class="card mb-3 border-primary"><div class="card-body">
+            <h6 class="mb-1">📦 {{ nob.count }} product(s) without a barcode · منتجات بدون باركود</h6>
+            <p class="small text-muted mb-2">Pick the item, tap <b>📷 Scan barcode</b> and scan its box. From then on, scanning that box opens the product.</p>
+            <input v-model="nob.q" class="form-control form-control-sm mb-2" placeholder="Search by name · ابحث بالاسم" @input="searchNoBarcode">
+            <div v-if="nob.q && !nob.products.length" class="small text-muted">No product found.</div>
+            <div v-for="p in nob.products" :key="'nb' + p.id" class="border-top pt-2 mt-2">
+                <div class="fw-bold small">{{ p.name }}
+                    <span v-if="p.review === 'pending'" class="badge bg-warning text-dark ms-1">waiting for approval</span>
+                    <span v-else-if="!p.status" class="badge bg-secondary ms-1">hidden</span></div>
+                <div v-for="v in p.variants" :key="'nbv' + v.id" class="d-flex align-items-center gap-2 py-1">
+                    <img v-if="v.image" :src="v.image" style="width:44px;height:44px;object-fit:contain;border-radius:8px;background:#fff;border:1px solid #eee">
+                    <div v-else class="sl-noimg" style="width:44px;height:44px">📦</div>
+                    <span class="flex-grow-1 small">{{ v.color }} <span class="text-muted">· {{ v.stock }} in stock</span></span>
+                    <button class="btn btn-primary btn-sm" @click="openBc(p, v)">📷 Scan barcode</button>
+                </div>
+            </div>
+            <button v-if="nob.count > nob.products.length && !nob.q" class="btn btn-link btn-sm px-0 mt-1" @click="$router.push('/products')">
+                Showing the newest {{ nob.products.length }} - search by name to find others</button>
+        </div></div>
+
         <!-- Recently added -->
         <div class="card mb-3"><div class="card-body">
             <div class="d-flex justify-content-between align-items-center mb-2">
@@ -244,6 +265,22 @@
             </div>
         </b-modal>
 
+        <!-- Custom (Lebazone): scan the box barcode of one chosen colour -->
+        <b-modal v-model="showBc" title="Scan the box barcode · امسح باركود العلبة" centered hide-footer @hidden="focusScan">
+            <template v-if="bc.v">
+                <div class="d-flex align-items-center gap-2 mb-3">
+                    <img v-if="bc.v.image" :src="bc.v.image" style="width:56px;height:56px;object-fit:contain;border-radius:8px;border:1px solid #eee">
+                    <div><b>{{ bc.p.name }}</b><br><span class="small">{{ bc.v.color }}</span></div>
+                </div>
+                <CameraScanner v-if="showBc" big label="📷 Open camera & scan" @scan="c => { bc.code = c; saveBc(); }" />
+                <div class="d-flex gap-2 mt-3">
+                    <input ref="bcInput" v-model="bc.code" class="form-control" placeholder="…or type / use a scanner gun" @keydown.enter.prevent="saveBc">
+                    <button class="btn btn-success" :disabled="busy || !bc.code.trim()" @click="saveBc">Save</button>
+                </div>
+                <div v-if="bc.v.barcode" class="small text-muted mt-2">Current barcode: {{ bc.v.barcode }} (will be replaced)</div>
+            </template>
+        </b-modal>
+
         <b-modal v-model="showAddColor" title="Add a colour · لون جديد" centered @hidden="focusScan">
             <div v-if="!addColor.product">
                 <label class="form-label">Find the product</label>
@@ -377,6 +414,7 @@ export default {
             showLink: false, link: { code: '', q: '', results: [], loading: false }, showPhotos: false, photosFor: { p: null, v: null }, catGuessed: false, catTouched: false, moreOpen: false,
             showAddColor: false, addColor: { product: null, color: '', barcode: '', stock: 1, price: '', sale_price: '', photo: null },
             searchTerm: '', searchResults: [],
+            nob: { count: 0, products: [], q: '' }, showBc: false, bc: { p: null, v: null, code: '' },
             showPick: false, pick: { mode: 'label', title: '', question: '', variants: [], selected: null, product: null, copies: 1 },
             labelSize: store.get('lbzLabelSize', '50x30'),
         };
@@ -399,6 +437,7 @@ export default {
         axios.get(this.$apiUrl + '/scan/options').then(r => { if (r.data.status === 1) this.opts = r.data.data; });
         this.loadRecent();
         this.loadMissing();
+        this.loadNoBarcode();
         this.focusScan();
     },
     methods: {
@@ -686,12 +725,38 @@ export default {
             }).catch(this.fail).finally(() => { this.busy = false; });
         },
         setBarcode(v) {
-            const bc = window.prompt('Scan or type the box barcode for ' + v.color);
-            if (!bc) return;
-            axios.post(this.$apiUrl + '/scan/set_barcode', { variant_id: v.id, barcode: bc.trim() }).then(r => {
-                if (r.data.status !== 1) return this.showError(r.data.message);
+            const p = this.products.find(x => (x.variants || []).some(y => y.id === v.id)) || { name: '' };
+            this.openBc(p, v);
+        },
+        // Custom (Lebazone): products without a box barcode - pick one, scan its box, done.
+        loadNoBarcode() {
+            const q = (this.nob.q || '').trim();
+            axios.get(this.$apiUrl + '/scan/no_barcode', { params: { q } }).then(r => {
+                if (r.data.status === 1 && (this.nob.q || '').trim() === q) Object.assign(this.nob, r.data.data);
+            }).catch(() => {});
+        },
+        searchNoBarcode() {
+            clearTimeout(this._nbT);
+            this._nbT = setTimeout(this.loadNoBarcode, 300);
+        },
+        openBc(p, v) {
+            this.bc = { p, v, code: '' };
+            this.showBc = true;
+            this.$nextTick(() => { if (this.$refs.bcInput) this.$refs.bcInput.focus(); });
+        },
+        saveBc() {
+            const code = (this.bc.code || '').trim();
+            if (!code || this.busy) return;
+            const { p, v } = this.bc;
+            this.busy = true;
+            axios.post(this.$apiUrl + '/scan/set_barcode', { variant_id: v.id, barcode: code }).then(r => {
+                if (r.data.status !== 1) { this.bc.code = ''; return this.showError(r.data.message); }
+                this.showBc = false;
                 this.products = [r.data.data];
-            }).catch(this.fail);
+                this.say(true, 'Barcode ' + code + ' saved on ' + (p.name ? p.name + ' - ' : '') + v.color + ' ✓ - scanning it now opens this product');
+                this.loadNoBarcode();
+                this.loadRecent();
+            }).catch(this.fail).finally(() => { this.busy = false; });
         },
         receivePrompt(v) {
             const n = parseInt(window.prompt('How many ' + v.color + ' did you receive? · كم وصل؟', '1'), 10);

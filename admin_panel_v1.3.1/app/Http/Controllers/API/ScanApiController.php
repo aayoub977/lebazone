@@ -504,8 +504,8 @@ class ScanApiController extends ProductApisController
         $sid = $this->currentSellerId();
         $ids = $sid !== null
             ? DB::table('products')->where('seller_id', $sid)->whereNull('deleted_at')->orderByDesc('id')->limit(10)->pluck('id')
-            : ProductVariant::where('sku', 'like', 'LBZ0%')->orderByDesc('id')->limit(40)
-                ->pluck('product_id')->unique()->take(10)->values();
+            // Custom (Lebazone): newest products from anywhere (this screen, the admin panel, bulk upload)
+            : DB::table('products')->whereNull('deleted_at')->orderByDesc('id')->limit(10)->pluck('id');
         return CommonHelper::responseWithData($ids->map(fn ($id) => $this->payload((int) $id))->values());
     }
 
@@ -662,6 +662,33 @@ class ScanApiController extends ProductApisController
             $v = ProductVariant::where('product_id', $id)->orderBy('id')->first();
             $out[] = ['id' => (int) $id, 'name' => $v->name ?? ('#' . $id), 'image' => $this->url($v->image ?? null)];
         }
+        return CommonHelper::responseWithData(['count' => $count, 'products' => $out]);
+    }
+
+    /**
+     * Custom (Lebazone): products with a colour that has no box barcode yet (e.g. added from the
+     * admin panel), newest first - pick one on the phone and scan its box to save the barcode.
+     */
+    public function noBarcode(Request $request)
+    {
+        $term = trim((string) $request->input('q', ''));
+        $q = DB::table('product_variants as pv')
+            ->join('products as p', 'p.id', '=', 'pv.product_id')
+            ->whereNull('p.deleted_at')
+            ->where(fn ($w) => $w->whereNull('pv.barcode')->orWhere('pv.barcode', ''));
+        if (Schema::hasColumn('product_variants', 'deleted_at')) $q->whereNull('pv.deleted_at');
+        if (($sid = $this->currentSellerId()) !== null) $q->where('p.seller_id', $sid);
+        if ($term !== '') {
+            $like = '%' . str_replace(['%', '_'], ['\\%', '\\_'], $term) . '%';
+            $q->where(fn ($w) => $w->where('p.name', 'like', $like)->orWhere('pv.name', 'like', $like)->orWhere('pv.sku', $term));
+        }
+        $count = (clone $q)->distinct()->count('pv.product_id');
+        $ids = $q->select('pv.product_id')->groupBy('pv.product_id')->orderByDesc('pv.product_id')->limit(15)->pluck('pv.product_id');
+        $out = $ids->map(function ($id) {
+            $p = $this->payload((int) $id);
+            $p['variants'] = array_values(array_filter($p['variants'], fn ($v) => $v['barcode'] === ''));
+            return $p;
+        })->values();
         return CommonHelper::responseWithData(['count' => $count, 'products' => $out]);
     }
 

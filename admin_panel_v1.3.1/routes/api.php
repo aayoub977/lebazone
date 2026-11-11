@@ -352,6 +352,7 @@ Route::middleware(['auth:api', 'store.scope'])->group(function () {
         Route::post('create', [ScanApiController::class, 'create']);
         Route::post('add_color', [ScanApiController::class, 'addColor']);
         Route::post('set_barcode', [ScanApiController::class, 'setBarcode']);
+        Route::get('no_barcode', [ScanApiController::class, 'noBarcode']); // Custom (Lebazone)
         Route::post('set_main_photo', [ScanApiController::class, 'setMainPhoto']); // Custom (Lebazone)
         Route::post('receive', [ScanApiController::class, 'receive']);
         Route::post('set_size', [ScanApiController::class, 'setSize']);
