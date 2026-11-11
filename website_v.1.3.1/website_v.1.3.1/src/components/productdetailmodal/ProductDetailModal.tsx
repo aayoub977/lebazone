@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { flagUrl, madeInName } from "@/utils/countryFlag";
 import { useRouter } from "next/navigation";
 import * as api from "@/api/apiRoutes";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
@@ -1350,13 +1351,24 @@ const ProductDetailModal = ({
                             </span>
                           </div>
                         )}
-                        {productDetails?.made_in?.name && (
-                          <div className="flex gap-2">
+                        {madeInName(productDetails?.made_in) && (
+                          <div className="flex items-center gap-2">
                             <span className="shrink-0 whitespace-nowrap font-semibold">
                               {t("made_in")} :
                             </span>
+                            {flagUrl(madeInName(productDetails?.made_in)) && (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={flagUrl(madeInName(productDetails?.made_in)) as string}
+                                alt=""
+                                width={20}
+                                height={15}
+                                className="h-[15px] w-5 rounded-[2px] object-cover shadow-sm"
+                                loading="lazy"
+                              />
+                            )}
                             <span className="text-gray-600 dark:text-zinc-300">
-                              {productDetails?.made_in?.name}
+                              {madeInName(productDetails?.made_in)}
                             </span>
                           </div>
                         )}

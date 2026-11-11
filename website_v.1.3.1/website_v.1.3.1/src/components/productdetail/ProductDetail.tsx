@@ -56,6 +56,7 @@ import {
   setListingSource,
 } from "@/redux/slices/productFilterSlice";
 import RecentalyViewedProducts from "../productslist/RecentalyViewedProducts";
+import { flagUrl, madeInName } from "@/utils/countryFlag";
 import { setIsRefetch } from "@/redux/slices/shopSlice";
 import { setShopMode } from "@/redux/slices/shopModeSlice";
 import { getProductTypeMeta } from "./productType";
@@ -1228,7 +1229,9 @@ const ProductDetail = ({ initialProduct = null }: ProductDetailProps) => {
                       .filter((a) => a?.attribute_value);
                     const vName = (v?.translations?.name || v?.name || "").trim();
                     const pName = (product?.translations?.name || product?.product_name || "").trim();
-                    if (!attrs.length && (!vName || vName === pName)) return null;
+                    const showName = !!vName && vName !== pName;
+                    const madeIn = madeInName(product?.made_in);
+                    if (!attrs.length && !showName && !madeIn) return null;
                     return (
                       <div className="flex flex-wrap gap-2">
                         {attrs.length ? (
@@ -1247,10 +1250,27 @@ const ProductDetail = ({ initialProduct = null }: ProductDetailProps) => {
                               <span className="font-semibold">{a.attribute_value}</span>
                             </span>
                           ))
-                        ) : (
+                        ) : showName ? (
                           <span className="inline-flex items-center rounded-full border px-3 py-1 text-sm font-semibold">
                             {vName}
                           </span>
+                        ) : null}
+                        {madeIn && (
+                          <span className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm">
+                                <span className="text-gray-500 dark:text-zinc-400">{t("made_in")}:</span>
+                                {flagUrl(madeInName(product?.made_in)) && (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img
+                                    src={flagUrl(madeInName(product?.made_in)) as string}
+                                    alt=""
+                                    width={20}
+                                    height={15}
+                                    className="h-[15px] w-5 rounded-[2px] object-cover shadow-sm"
+                                    loading="lazy"
+                                  />
+                                )}
+                                <span className="font-semibold">{madeInName(product?.made_in)}</span>
+                              </span>
                         )}
                       </div>
                     );
@@ -1358,6 +1378,27 @@ const ProductDetail = ({ initialProduct = null }: ProductDetailProps) => {
                         </div>
                       </div>
                     ))}
+
+                  {/* Custom (Lebazone): "Made in" sits with the colour/size choice */}
+                  {product?.variants?.length > 1 && madeInName(product?.made_in) && (
+                    <div className="flex flex-wrap gap-2">
+                              <span className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm">
+                                <span className="text-gray-500 dark:text-zinc-400">{t("made_in")}:</span>
+                                {flagUrl(madeInName(product?.made_in)) && (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img
+                                    src={flagUrl(madeInName(product?.made_in)) as string}
+                                    alt=""
+                                    width={20}
+                                    height={15}
+                                    className="h-[15px] w-5 rounded-[2px] object-cover shadow-sm"
+                                    loading="lazy"
+                                  />
+                                )}
+                                <span className="font-semibold">{madeInName(product?.made_in)}</span>
+                              </span>
+                    </div>
+                  )}
 
                   <hr className="border-gray-200 dark:border-zinc-700 my-0.5" />
 
@@ -1618,16 +1659,6 @@ const ProductDetail = ({ initialProduct = null }: ProductDetailProps) => {
                           {Array.isArray(product?.tag_names)
                             ? product.tag_names.join(", ")
                             : product?.tag_names}
-                        </span>
-                      </div>
-                    )}
-                    {product?.made_in?.name && (
-                      <div className="flex gap-2">
-                        <span className="font-semibold whitespace-nowrap text-start">
-                          {t("made_in")} :
-                        </span>
-                        <span className="text-gray-600 dark:text-zinc-300">
-                          {product?.made_in?.name}
                         </span>
                       </div>
                     )}
