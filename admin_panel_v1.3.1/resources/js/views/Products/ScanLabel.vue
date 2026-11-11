@@ -349,6 +349,7 @@ import axios from 'axios';
 import CameraScanner from '../../components/CameraScanner.vue';
 import WeightCost from '../../components/WeightCost.vue';
 import { printProductLabels } from '../../utils/warehousePrint.js';
+import { listenForUnlock, soundOk, soundDone, soundError, soundInfo } from '../../utils/sounds.js'; // Custom (Lebazone): scan sounds
 
 const blankForm = () => ({ barcode: '', name: '', name_ar: '', category_id: '', brand_id: '', price: '', sale_price: '', cost: '',
     warranty: '1 year', description: '', photo: null, size: '', weight_g: 0, colors: [{ color: '', barcode: '', stock: 1 }] });
@@ -438,6 +439,7 @@ export default {
         this.loadRecent();
         this.loadMissing();
         this.loadNoBarcode();
+        listenForUnlock();
         this.focusScan();
     },
     methods: {
@@ -569,16 +571,17 @@ export default {
             if (!code || this.busy) return;
             this.busy = true;
             axios.get(this.$apiUrl + '/scan/lookup', { params: { code } }).then(r => {
-                if (r.data.status !== 1) return this.showError(r.data.message);
+                if (r.data.status !== 1) { soundError(); return this.showError(r.data.message); }
                 const d = r.data.data;
                 this.code = '';
                 if (!d.found) {
-                    if (this.receiveMode) { this.say(false, 'Barcode ' + code + ' is not in the shop yet — switch to "Add / find" to add it.'); return; }
+                    if (this.receiveMode) { soundError(); this.say(false, 'Barcode ' + code + ' is not in the shop yet — switch to "Add / find" to add it.'); return; }
                     // Custom (Lebazone): typed words (not a barcode) = find products by name
                     if (/[a-z\u0600-\u06ff]/i.test(code) && /\s|[a-z\u0600-\u06ff]{3,}/i.test(code) && !/^[A-Z]{3}[-0-9]/.test(code)) {
                         axios.get(this.$apiUrl + '/scan/search', { params: { q: code } }).then(rs => {
                             const list = rs.data.data || [];
-                            if (!list.length) return this.say(false, 'No product named "' + code + '"');
+                            if (!list.length) { soundError(); return this.say(false, 'No product named "' + code + '"'); }
+                            soundOk();
                             this.products = list;
                             this.say(true, list.length + ' product(s) matching "' + code + '" - tap "add box barcode" to link a barcode');
                         });
@@ -592,16 +595,18 @@ export default {
                     if (this.photoUrl) URL.revokeObjectURL(this.photoUrl);
                     this.photoUrl = ''; this.clearMorePhotos();
                     this.guessCategory();
+                    soundInfo(); // new barcode: the add form opens
                     this.showNew = true;
                     return;
                 }
                 this.products = d.products;
+                if (!this.receiveMode) soundOk(); // known barcode: product found
                 if (this.receiveMode) {
                     const matches = d.products.flatMap(p => p.variants.filter(v => v.matched));
                     if (matches.length === 1) this.receive(matches[0], 1);
-                    else if (matches.length > 1) this.openPick('receive', d.products[0], matches, 'Which colour?', 'This barcode is on several colours — which one did you receive?');
+                    else if (matches.length > 1) { soundInfo(); this.openPick('receive', d.products[0], matches, 'Which colour?', 'This barcode is on several colours — which one did you receive?'); }
                 }
-            }).catch(this.fail).finally(() => { this.busy = false; this.focusScan(); });
+            }).catch(e => { soundError(); this.fail(e); }).finally(() => { this.busy = false; this.focusScan(); });
         },
 
         saveNew() {
@@ -717,7 +722,8 @@ export default {
             if (v.barcode && !window.confirm(v.color + ' already has barcode ' + v.barcode + '. Replace it with ' + this.link.code + '?')) return;
             this.busy = true;
             axios.post(this.$apiUrl + '/scan/set_barcode', { variant_id: v.id, barcode: this.link.code }).then(r => {
-                if (r.data.status !== 1) return this.showError(r.data.message);
+                if (r.data.status !== 1) { soundError(); return this.showError(r.data.message); }
+                soundDone();
                 this.products = [r.data.data];
                 this.showLink = false;
                 this.say(true, 'Barcode ' + this.link.code + ' saved on ' + v.color + ' ✓ - scanning it now opens this product');
@@ -750,7 +756,8 @@ export default {
             const { p, v } = this.bc;
             this.busy = true;
             axios.post(this.$apiUrl + '/scan/set_barcode', { variant_id: v.id, barcode: code }).then(r => {
-                if (r.data.status !== 1) { this.bc.code = ''; return this.showError(r.data.message); }
+                if (r.data.status !== 1) { soundError(); this.bc.code = ''; return this.showError(r.data.message); }
+                soundDone();
                 this.showBc = false;
                 this.products = [r.data.data];
                 this.say(true, 'Barcode ' + code + ' saved on ' + (p.name ? p.name + ' - ' : '') + v.color + ' ✓ - scanning it now opens this product');
@@ -764,7 +771,8 @@ export default {
         },
         receive(v, qty) {
             axios.post(this.$apiUrl + '/scan/receive', { variant_id: v.id, qty }).then(r => {
-                if (r.data.status !== 1) return this.say(false, r.data.message);
+                if (r.data.status !== 1) { soundError(); return this.say(false, r.data.message); }
+                soundOk();
                 this.products = [r.data.data];
                 const nv = r.data.data.variants.find(x => x.id === v.id);
                 this.say(true, '+' + qty + ' ' + v.color + ' ✓ — now ' + (nv ? nv.stock : '') + ' in stock');

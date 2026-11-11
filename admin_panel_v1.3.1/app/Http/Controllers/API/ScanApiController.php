@@ -250,6 +250,7 @@ class ScanApiController extends ProductApisController
                 'id' => $v->id,
                 'code' => $v->sku,
                 'barcode' => $v->barcode ?? '',
+                'no_barcode' => (int) ($v->lbz_no_barcode ?? 0) === 1, // Custom (Lebazone): uses Lebazone labels
                 'color' => $color ?: 'Standard',
                 'image' => $this->url($v->image),
                 // Custom (Lebazone): the colour's other photos, so one can be made the main photo
@@ -676,6 +677,8 @@ class ScanApiController extends ProductApisController
             ->join('products as p', 'p.id', '=', 'pv.product_id')
             ->whereNull('p.deleted_at')
             ->where(fn ($w) => $w->whereNull('pv.barcode')->orWhere('pv.barcode', ''));
+        // colours marked "no barcode - Lebazone labels" in the admin panel don't need a scan
+        if (Schema::hasColumn('product_variants', 'lbz_no_barcode')) $q->where(fn ($w) => $w->whereNull('pv.lbz_no_barcode')->orWhere('pv.lbz_no_barcode', 0));
         if (Schema::hasColumn('product_variants', 'deleted_at')) $q->whereNull('pv.deleted_at');
         if (($sid = $this->currentSellerId()) !== null) $q->where('p.seller_id', $sid);
         if ($term !== '') {
@@ -686,7 +689,7 @@ class ScanApiController extends ProductApisController
         $ids = $q->select('pv.product_id')->groupBy('pv.product_id')->orderByDesc('pv.product_id')->limit(15)->pluck('pv.product_id');
         $out = $ids->map(function ($id) {
             $p = $this->payload((int) $id);
-            $p['variants'] = array_values(array_filter($p['variants'], fn ($v) => $v['barcode'] === ''));
+            $p['variants'] = array_values(array_filter($p['variants'], fn ($v) => $v['barcode'] === '' && empty($v['no_barcode'])));
             return $p;
         })->values();
         return CommonHelper::responseWithData(['count' => $count, 'products' => $out]);
@@ -795,6 +798,7 @@ class ScanApiController extends ProductApisController
             return CommonHelper::responseError("Barcode $bc already belongs to another product");
         }
         $v->barcode = $bc !== '' ? $bc : null;
+        if ($bc !== '' && Schema::hasColumn('product_variants', 'lbz_no_barcode')) $v->lbz_no_barcode = 0;
         if (trim((string) $v->sku) === '') $v->sku = $this->nextCode(); // Custom (Lebazone): a Lebazone code for items that had none
         $v->save();
         return CommonHelper::responseSuccessWithData('Barcode saved', $this->payload($v->product_id, $bc));

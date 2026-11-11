@@ -629,6 +629,33 @@
                                                     <input type="text" class="form-control" v-model="v.hsn_code" />
                                                 </div>
                                             </div>
+                                            <!-- Custom (Lebazone): own box barcode, or Lebazone labels? -->
+                                            <div class="col-12">
+                                                <div class="lbz-bc border rounded p-2 mb-3">
+                                                    <div class="fw-semibold small mb-1">Does this item have its own barcode on the box? · هل للمنتج باركود؟</div>
+                                                    <div v-if="v.barcode" class="small text-success">✓ Barcode {{ v.barcode }} is saved - scanning the box opens this item.</div>
+                                                    <template v-else>
+                                                        <div class="btn-group btn-group-sm mb-1" role="group">
+                                                            <button type="button" class="btn" :class="v.lbz_no_barcode === 0 ? 'btn-primary' : 'btn-outline-primary'"
+                                                                @click="v.lbz_no_barcode = 0">Yes, it has a barcode</button>
+                                                            <button type="button" class="btn" :class="v.lbz_no_barcode === 1 ? 'btn-dark' : 'btn-outline-dark'"
+                                                                @click="v.lbz_no_barcode = 1">No barcode</button>
+                                                        </div>
+                                                        <div v-if="v.lbz_no_barcode === 0" class="small text-muted">
+                                                            After saving, open <b>Scan products</b> on the phone → <b>📦 Products without a barcode</b> → tap
+                                                            <b>📷 Scan barcode</b> next to this item and scan its box. The barcode is then saved for good.</div>
+                                                        <div v-else-if="v.lbz_no_barcode === 1" class="d-flex align-items-center flex-wrap gap-2 small">
+                                                            <span class="text-muted">Stick Lebazone labels (barcode = SKU <code>{{ v.sku || '…' }}</code>) on each piece:</span>
+                                                            <input type="number" min="1" max="500" class="form-control form-control-sm" style="width:80px" v-model.number="v.labelCopies">
+                                                            <select v-model="labelSize" class="form-select form-select-sm" style="width:auto">
+                                                                <option value="50x30">50×30 mm</option><option value="40x25">40×25 mm</option>
+                                                                <option value="58x40">58×40 mm</option><option value="a4">A4 sheet</option>
+                                                            </select>
+                                                            <button type="button" class="btn btn-sm btn-dark" @click="printVariantLabels(v)">🏷 Print labels</button>
+                                                        </div>
+                                                    </template>
+                                                </div>
+                                            </div>
                                             <div class="w-100"></div>
                                             <div class="col-md-12 col-lg-6">
                                                 <FileUpload v-model="v.image_file" :label="__('main_image')" required
@@ -1112,6 +1139,7 @@ import CountryZoneFilter from '../../mixins/CountryZoneFilter.js';
 import UnsavedChanges from '../../mixins/UnsavedChanges.js';
 import AttributeEdit from '../Category/Attributes/Edit.vue';
 import WeightCost from '../../components/WeightCost.vue';
+import { printProductLabels } from '../../utils/warehousePrint.js';
 import CategoryEdit from '../Category/Edit.vue';
 import BrandEdit from './Brands/Edit.vue';
 import DatePicker from '../../components/DatePicker.vue';
@@ -1122,7 +1150,10 @@ export default {
     components: { WeightCost, AttributeEdit, CategoryEdit, BrandEdit, editor: Editor, DatePicker, MediaPicker, ArrowLeft, ArrowRight, Plus, Pencil, Sparkles, Info, Copy, Save, Zap, X, LoaderCircle, ImageIcon },
     mixins: [TranslationHelper, CountryZoneFilter, UnsavedChanges],
     data() {
+        let labelSize = '50x30';
+        try { labelSize = localStorage.getItem('lbzLabelSize') || '50x30'; } catch (e) {}
         return {
+            labelSize, // Custom (Lebazone): label size for "No barcode" items
             czAllowAll: true, // store-wise inventory lists ALL countries' stores by default
             id: (this.$route?.params?.id && !this.$route?.params?.clone) ? Number(this.$route.params.id) : null,
             cloneSourceId: this.$route?.params?.clone ? Number(this.$route.params.id) : null,
@@ -1457,6 +1488,19 @@ export default {
         }
     },
     methods: {
+        // Custom (Lebazone): Lebazone price labels for a colour with no barcode of its own
+        printVariantLabels(v) {
+            const sku = (v.sku || '').trim();
+            if (!sku) return this.showError('This item needs a SKU first');
+            if (!v.id && !window.confirm('This product is not saved yet - the labels only work after you save it. Print anyway?')) return;
+            const st = (v.store_stocks || []).find(s => s.is_listed && (s.discounted_price || s.price)) || (v.store_stocks || [])[0] || {};
+            const name = (this.translations && this.translations[this.defaultLanguageId] && this.translations[this.defaultLanguageId].name)
+                || (v.translations[this.defaultLanguageId] || {}).name || '';
+            const color = (v.translations[this.defaultLanguageId] || {}).name || '';
+            printProductLabels({ name }, { code: sku, color: color === name ? '' : color, sale_price: st.discounted_price || st.price || 0 },
+                Math.max(1, Math.min(500, +v.labelCopies || 1)), this.labelSize, 'Lebazone');
+            try { localStorage.setItem('lbzLabelSize', this.labelSize); } catch (e) {}
+        },
         // Tracked state for the UnsavedChanges guard (warn before leaving with edits).
         formState() {
             return {
@@ -1466,6 +1510,7 @@ export default {
                     id: v.id ?? null,
                     sku: v.sku,
                     hsn_code: v.hsn_code,
+                    lbz_no_barcode: v.lbz_no_barcode,
                     stock: v.stock,
                     translations: v.translations,
                     attribute_values: v.attribute_values,
@@ -2218,6 +2263,9 @@ export default {
                 translations: trans,
                 sku: v.sku || '',
                 hsn_code: v.hsn_code || '',
+                barcode: v.barcode || '', // Custom (Lebazone)
+                lbz_no_barcode: (v.lbz_no_barcode === null || v.lbz_no_barcode === undefined) ? null : Number(v.lbz_no_barcode),
+                labelCopies: 1,
                 // Price / discounted / slabs / purchase are per-store now (store_stocks).
                 stock: Number(v.stock) || 0,
                 image_file: null,
@@ -2471,6 +2519,9 @@ export default {
                 translations: trans,
                 sku: keepId ? src.sku : '',
                 hsn_code: src.hsn_code || '',
+                barcode: keepId ? (src.barcode || '') : '',
+                lbz_no_barcode: keepId ? (src.lbz_no_barcode ?? null) : null,
+                labelCopies: 1,
                 stock: src.stock ?? 0,
                 image_file: src.image_file || null,
                 image_preview: src.image_preview || null,
@@ -2507,6 +2558,9 @@ export default {
                 translations: trans,
                 sku: '',
                 hsn_code: '',
+                barcode: '',
+                lbz_no_barcode: null, // Custom (Lebazone): null = not answered yet
+                labelCopies: 1,
                 // Price / discounted / slabs / purchase are per-store now (store_stocks).
                 stock: 0,
                 image_file: null,
@@ -2960,6 +3014,7 @@ export default {
                     name: v.translations[this.defaultLanguageId]?.name || '',
                     sku: v.sku,
                     hsn_code: v.hsn_code || '',
+                    lbz_no_barcode: v.lbz_no_barcode, // Custom (Lebazone)
                     // Price / discounted / slabs / purchase are per-store now (store_stocks).
                     stock: v.stock,
                     image_path: v.image_path || null,

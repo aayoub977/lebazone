@@ -166,7 +166,7 @@
                 <div class="row g-2 mt-2 align-items-end">
                     <div class="col"><label class="form-label small mb-1">Barcode on the item <span class="text-muted">(scan it)</span></label>
                         <div class="d-flex gap-2"><input class="form-control" v-model="f.barcode" placeholder="Scan or type the barcode printed on the item" autocomplete="off" @keydown.enter.prevent>
-                            <CameraScanner @scan="c => { f.barcode = c; }" /></div>
+                            <CameraScanner @scan="c => { f.barcode = c; scanBeep(); }" /></div>
                         <div class="form-text">No barcode on the item? Leave it empty — the product gets a Lebazone code (LBZ…) and you print stickers when the goods arrive.</div></div>
                 </div>
                 <div v-if="zoom" class="pur-zoom" @click="zoom = null"><img :src="zoom" alt=""></div>
@@ -247,6 +247,7 @@
 import axios from 'axios';
 import { ITEM_STATUS, num, fmt, post } from './purchasing.js';
 import CameraScanner from '../../components/CameraScanner.vue';
+import { soundOk } from '../../utils/sounds.js'; // Custom (Lebazone): scan sound
 import { printProductLabels } from '../../utils/warehousePrint.js';
 
 const STYLE_LABEL = { studio: 'White background', angle: 'Other angle', lifestyle: 'In use', detail: 'Close-up', packaging: 'With box' };
@@ -280,6 +281,7 @@ export default {
     mounted() { this.$nextTick(() => { this.dirty = false; }); this.runPreview(); document.addEventListener('keydown', this.onKey); },
     beforeUnmount() { this.stopAi = true; clearTimeout(this.aiTimer); document.removeEventListener('keydown', this.onKey); clearTimeout(this.timer); if (this.preview) URL.revokeObjectURL(this.preview); },
     methods: {
+        scanBeep() { soundOk(); }, // Custom (Lebazone): sound + buzz when the camera reads the barcode
         fmt,
         onKey(e) { if (e.key === 'Escape') this.$emit('close'); },
         money(v, d = 2) { return v == null || v === '' ? '—' : (this.data.settings.currency ? this.data.settings.currency + ' ' : '') + fmt(Number(v), d); },

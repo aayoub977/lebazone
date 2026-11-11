@@ -465,6 +465,13 @@ class ProductApisController extends Controller
         return CommonHelper::responseWithData($products);
     }
 
+    /** Custom (Lebazone): is the barcode-choice column there yet (migration run)? */
+    private static ?bool $noBarcodeCol = null;
+    private static function hasNoBarcodeCol(): bool
+    {
+        return self::$noBarcodeCol ??= \Illuminate\Support\Facades\Schema::hasColumn('product_variants', 'lbz_no_barcode');
+    }
+
     public function save(Request $request)
     {
         return $this->stepperSave($request);
@@ -719,6 +726,11 @@ class ProductApisController extends Controller
             $variant->name = $row['name'] ?? null;
             $variant->sku = $row['sku'] ?? null;
             $variant->hsn_code = $row['hsn_code'] ?? null;
+            // Custom (Lebazone): has its own box barcode (0) or uses Lebazone labels (1)
+            if (array_key_exists('lbz_no_barcode', $row) && self::hasNoBarcodeCol()) {
+                $nb = $row['lbz_no_barcode'];
+                $variant->lbz_no_barcode = ($nb === null || $nb === '') ? null : (int) (bool) $nb;
+            }
             // Price / discounted / slabs / purchase are per-store now (PVSS), written
             // in syncVariantStoreStocks — nothing price-related stays on the variant.
             $variant->sort_order = $idx;
@@ -1026,6 +1038,8 @@ class ProductApisController extends Controller
                 'name' => $v->name,
                 'sku' => $v->sku,
                 'hsn_code' => $v->hsn_code,
+                'barcode' => $v->barcode ?? '', // Custom (Lebazone)
+                'lbz_no_barcode' => self::hasNoBarcodeCol() ? $v->lbz_no_barcode : null,
                 'sort_order' => $v->sort_order,
                 'image' => $v->image ? asset('storage/' . $v->image) : null,
                 'image_path' => $v->image,
