@@ -5145,19 +5145,17 @@ class CommonHelper
         $langId = LanguageService::getCurrentId() ?: self::getDefaultLanguageId();
         $defaultId = self::getDefaultLanguageId();
 
+        // Custom (Lebazone): the PRODUCT's name (was the first colour's name, e.g. "White / Medium")
         return DB::table('products as p')
-            ->join('product_variants as pv', 'pv.id', '=', DB::raw(
-                '(SELECT MIN(pv2.id) FROM product_variants pv2 WHERE pv2.product_id = p.id AND pv2.deleted_at IS NULL)'
-            ))
-            ->leftJoin('product_variant_translations as t', function ($j) use ($langId) {
-                $j->on('t.product_variant_id', '=', 'pv.id')->where('t.language_id', $langId);
+            ->leftJoin('product_translations as t', function ($j) use ($langId) {
+                $j->on('t.product_id', '=', 'p.id')->where('t.language_id', $langId);
             })
-            ->leftJoin('product_variant_translations as td', function ($j) use ($defaultId) {
-                $j->on('td.product_variant_id', '=', 'pv.id')->where('td.language_id', $defaultId);
+            ->leftJoin('product_translations as td', function ($j) use ($defaultId) {
+                $j->on('td.product_id', '=', 'p.id')->where('td.language_id', $defaultId);
             })
             ->where('p.status', 1)
             ->whereNull('p.deleted_at')
-            ->select(DB::raw('COALESCE(NULLIF(t.name, ""), NULLIF(td.name, ""), pv.name) as pname'))
+            ->select(DB::raw('COALESCE(NULLIF(t.name, ""), NULLIF(td.name, ""), p.name) as pname'))
             ->havingRaw('pname IS NOT NULL AND pname != ""')
             ->inRandomOrder()
             ->limit($limit)

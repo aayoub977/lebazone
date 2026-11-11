@@ -56,12 +56,6 @@ import {
   setListingSource,
 } from "@/redux/slices/productFilterSlice";
 import RecentalyViewedProducts from "../productslist/RecentalyViewedProducts";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { setIsRefetch } from "@/redux/slices/shopSlice";
 import { setShopMode } from "@/redux/slices/shopModeSlice";
 import { getProductTypeMeta } from "./productType";
@@ -177,6 +171,8 @@ const ProductDetail = ({ initialProduct = null }: ProductDetailProps) => {
   // ("Frequently Bought Together") into view so the user sees related products.
   const recommendationsRef = useRef<HTMLDivElement>(null);
   const [isShortDescClamped, setIsShortDescClamped] = useState(false);
+  // Custom (Lebazone): "View more" opens the text in place instead of a pop-up
+  const [shortDescOpen, setShortDescOpen] = useState(false);
 
   const ratingsCount = 10;
 
@@ -404,12 +400,13 @@ const ProductDetail = ({ initialProduct = null }: ProductDetailProps) => {
     return variant?.name ?? "";
   };
 
-  // Title follows the selected variant; falls back to the parent product name.
+  // Custom (Lebazone): the title is the PRODUCT's name. Colour/size names ("White / Medium")
+  // belong in the variant picker below, not in the heading.
   const displayName =
-    selectVariant?.translations?.name ??
-    selectVariant?.name ??
-    product?.translations?.name ??
-    product?.name;
+    product?.translations?.name ||
+    product?.name ||
+    selectVariant?.translations?.name ||
+    selectVariant?.name;
 
   // True when an axis represents color — drives the swatch dot render.
   const isColorAxis = (axis) => /colou?r/i.test(axis?.attribute_name || "");
@@ -1206,26 +1203,18 @@ const ProductDetail = ({ initialProduct = null }: ProductDetailProps) => {
                     <div className="flex flex-col items-start gap-1">
                       <p
                         ref={shortDescRef}
-                        className="line-clamp-3 text-base font-normal leading-6 text-gray-600 dark:text-zinc-300"
+                        className={`${shortDescOpen ? "" : "line-clamp-3"} whitespace-pre-line text-base font-normal leading-6 text-gray-600 dark:text-zinc-300`}
                       >
                         {product?.short_description}
                       </p>
-                      {isShortDescClamped && (
-                        <TooltipProvider delayDuration={150}>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <button
-                                type="button"
-                                className="primaryColor text-sm font-medium underline underline-offset-2"
-                              >
-                                {t("view_more")}
-                              </button>
-                            </TooltipTrigger>
-                            <TooltipContent className="max-w-sm text-gray-600 dark:text-zinc-300">
-                              {product?.short_description}
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
+                      {(isShortDescClamped || shortDescOpen) && (
+                        <button
+                          type="button"
+                          onClick={() => setShortDescOpen((v) => !v)}
+                          className="primaryColor text-sm font-medium underline underline-offset-2"
+                        >
+                          {shortDescOpen ? t("view_less") : t("view_more")}
+                        </button>
                       )}
                     </div>
                   )}

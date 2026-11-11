@@ -533,7 +533,7 @@ const CartDrawerProductsCard = ({
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex items-start justify-between gap-2">
           <h2 className="line-clamp-2 text-sm font-semibold leading-snug capitalize">
-            {product?.name ?? product?.product?.translations?.name}
+            {product?.product_name || product?.product?.translations?.name || product?.name}
           </h2>
           <button
             type="button"

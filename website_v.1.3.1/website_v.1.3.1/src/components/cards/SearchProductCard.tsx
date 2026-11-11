@@ -42,7 +42,7 @@ const SearchProductCard = ({ product, onResultClick }: SearchProductCardProps) =
                 </div>
                 <div className="flex flex-col flex-grow text-start min-w-0">
                     <div className="text-sm font-semibold text-zinc-800 dark:text-zinc-200 truncate group-hover:text-primary-color transition-colors duration-200">
-                        {product?.translations?.name ?? product?.name}
+                        {product?.translations?.name || product?.product_name || product?.name}
                     </div>
                     <div className="text-xs font-medium mt-0.5">
                         {

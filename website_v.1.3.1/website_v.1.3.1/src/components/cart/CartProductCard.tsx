@@ -122,7 +122,8 @@ const CartProductCard = ({
   // ---- normalize new API shape (fallback to old keys) ----
   const productId = product?.id ?? product?.["product_id"];
   const variantId = product?.variant_id ?? product?.["product_variant_id"];
-  const productName = product?.name ?? product?.product?.translations?.name;
+  // Custom (Lebazone): the product's name, not the colour/size name
+  const productName = product?.product_name || product?.product?.translations?.name || product?.name;
   const productImage =
     product?.images?.[0]?.image_url ??
     product?.variants?.[0]?.image ??

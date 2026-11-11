@@ -788,7 +788,7 @@ const HomeListViewCard = ({
             )}
 
             <h3 className="textColor text-sm sm:text-base font-bold capitalize line-clamp-1 sm:line-clamp-2 transition-colors duration-200 group-hover:primaryColor dark:group-hover:text-white">
-              {product?.translations?.name ?? product?.name}
+              {product?.translations?.name || product?.product_name || product?.name}
             </h3>
 
             {/* rating + delivery on one line */}

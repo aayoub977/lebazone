@@ -78,7 +78,7 @@ const WishlistCard = ({
   const ratingCount = product?.rating_count;
   const inStock = product?.in_stock;
   const brandName = product?.brand_name;
-  const productName = product?.translations?.name ?? product?.name;
+  const productName = product?.translations?.name || product?.product_name || product?.name;
 
   const displayPrice = hasDiscount
     ? product?.variants?.[0]?.discounted_price

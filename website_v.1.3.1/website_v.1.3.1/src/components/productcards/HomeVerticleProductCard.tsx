@@ -763,7 +763,7 @@ const HomeVerticleProductCard = ({
                     className={`absolute inset-0 object-contain h-full w-full p-1.5 md:p-2.5 transition-opacity duration-700 ease-in-out ${
                       idx === hoverImgIdx ? "opacity-100" : "opacity-0"
                     } ${isProductAvailabel || storeClosed ? "grayscale" : ""}`}
-                    alt={product?.translations?.name ?? product?.name}
+                    alt={product?.translations?.name || product?.product_name || product?.name}
                     src={imgSrc}
                     width={300}
                     height={300}
@@ -774,7 +774,7 @@ const HomeVerticleProductCard = ({
             ) : (
               <ImageWithPlaceholder
                 className={`object-contain h-full w-full p-1.5 md:p-2.5 transition-transform duration-300 ease-out group-hover:scale-110 ${isProductAvailabel || storeClosed ? "grayscale" : ""}`}
-                alt={product?.translations?.name ?? product?.name}
+                alt={product?.translations?.name || product?.product_name || product?.name}
                 src={product?.image_url}
                 width={300}
                 height={300}
@@ -878,7 +878,7 @@ const HomeVerticleProductCard = ({
           {/* name — single line on mobile (Blinkit-style), reserved min-height keeps
               every card the same size so price rows align across a row. */}
           <h3 className="mt-0.5 textColor text-[12px] md:text-[13px] font-semibold leading-snug line-clamp-1 capitalize">
-            {product?.translations?.name ?? product?.name}
+            {product?.translations?.name || product?.product_name || product?.name}
           </h3>
 
           {/* Rating row — rendered only when the product is rated. Desktop used
