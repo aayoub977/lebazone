@@ -882,13 +882,18 @@
                                                                         </div>
                                                                     </div>
                                                                     <div class="col-6">
-                                                                        <label class="ss-mini-label">{{ __('discounted_price') }}</label>
+                                                                        <label class="ss-mini-label">Sale price <span class="text-muted fw-normal">(optional - empty = no sale)</span></label>
                                                                         <div class="input-group input-group-sm">
                                                                             <span class="input-group-text px-2">{{ st.currency || $currency }}</span>
                                                                             <input type="number" min="0" step="0.01" class="form-control"
                                                                                 :class="{ 'is-invalid': storeDiscountInvalid(storeStock(v, st.id)) }"
-                                                                                v-model.number="storeStock(v, st.id).discounted_price">
+                                                                                v-model.number="storeStock(v, st.id).discounted_price" placeholder="no sale">
+                                                                            <button v-if="Number(storeStock(v, st.id).discounted_price) > 0" type="button" class="btn btn-outline-secondary"
+                                                                                title="Remove the sale" @click="storeStock(v, st.id).discounted_price = null">×</button>
                                                                         </div>
+                                                                        <!-- Custom (Lebazone): make it obvious the product will show as on sale -->
+                                                                        <div v-if="Number(storeStock(v, st.id).discounted_price) > 0 && Number(storeStock(v, st.id).discounted_price) < Number(storeStock(v, st.id).price)"
+                                                                            class="small text-danger mt-1">Shows ON SALE: {{ Math.round((1 - storeStock(v, st.id).discounted_price / storeStock(v, st.id).price) * 100) }}% off</div>
                                                                     </div>
                                                                     <div class="col-6">
                                                                         <label class="ss-mini-label">{{ __('customer_price') }}</label>
