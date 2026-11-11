@@ -6,27 +6,43 @@
                 <h3 class="page-head-title">Sellers</h3>
                 <button class="btn btn-primary list-add-btn ms-auto" @click="openSeller(null)">Add seller</button>
             </div>
-            <!-- Custom (Lebazone): products sellers added themselves wait here -->
-            <div v-if="pending.length" class="card mb-3 border-warning"><div class="card-body">
-                <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
-                    <h5 class="mb-0">Waiting for your approval ({{ pending.length }})</h5>
-                    <button class="btn btn-sm ms-auto" :class="delAllArmed ? 'btn-danger' : 'btn-outline-danger'" :disabled="busy" @click="deleteAllPending">
-                        {{ delAllArmed ? 'Click again to delete all ' + pending.length : 'Delete all' }}</button>
-                </div>
-                <p class="small text-muted">Added by sellers from their own login. Approve to put it on the shop, or reject with a reason they will see.</p>
-                <div v-for="p in pending" :key="'pp' + p.id" class="d-flex align-items-center gap-3 border-bottom py-2 flex-wrap">
-                    <img v-if="p.image" :src="p.image" alt="" style="width:56px;height:56px;object-fit:cover;border-radius:8px">
-                    <div class="flex-grow-1" style="min-width:180px">
-                        <div class="fw-semibold">{{ p.name }}</div>
-                        <div class="small text-muted">{{ p.seller }} · {{ p.colors }} colour(s) · {{ money(p.sale_price != null ? p.sale_price : p.price) }} · {{ p.stock }} pcs</div>
+            <!-- Custom (Lebazone): two tabs - the sellers, and every product waiting for approval -->
+            <ul class="nav nav-tabs mb-3">
+                <li class="nav-item"><button type="button" class="nav-link" :class="{ active: tab === 'sellers' }" @click="setTab('sellers')">Sellers ({{ sellers.length }})</button></li>
+                <li class="nav-item"><button type="button" class="nav-link" :class="{ active: tab === 'pending' }" @click="setTab('pending')">
+                    Waiting for approval <span class="badge" :class="pending.length ? 'bg-warning text-dark' : 'bg-light text-dark'">{{ pending.length }}</span></button></li>
+            </ul>
+
+            <div v-if="tab === 'pending'">
+                <div v-if="!pending.length" class="list-surface p-5 text-center text-muted">Nothing waiting - products sellers add from their login appear here.</div>
+                <template v-else>
+                    <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                        <span class="small text-muted">Tap a product to see it the way customers will, then approve or reject it.</span>
+                        <button class="btn btn-sm ms-auto" :class="delAllArmed ? 'btn-danger' : 'btn-outline-danger'" :disabled="busy" @click="deleteAllPending">
+                            {{ delAllArmed ? 'Click again to delete all ' + pending.length : 'Delete all ' + pending.length }}</button>
                     </div>
-                    <a :href="'/products/edit/' + p.id" class="btn btn-sm btn-outline-secondary">Check / edit</a>
-                    <button class="btn btn-sm btn-success" :disabled="busy" @click="review(p, 'approve')">Approve</button>
-                    <button class="btn btn-sm btn-outline-danger" :disabled="busy" @click="review(p, 'reject')">Reject</button>
-                    <button class="btn btn-sm btn-link text-danger" :disabled="busy" @click="deletePending(p)" :aria-label="'Delete ' + p.name">Delete</button>
-                </div>
-            </div></div>
-            <div class="list-surface p-3">
+                    <div v-for="g in pendingBySeller" :key="'g' + g.id" class="card mb-3"><div class="card-body">
+                        <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                            <h5 class="mb-0">{{ g.name }}</h5>
+                            <span class="badge bg-warning text-dark">{{ g.items.length }} waiting</span>
+                            <span class="ms-auto"></span>
+                            <button class="btn btn-sm btn-outline-danger" :disabled="busy" @click="deleteGroup(g)">Delete these {{ g.items.length }}</button>
+                        </div>
+                        <div class="pend-grid">
+                            <router-link v-for="p in g.items" :key="'pp' + p.id" :to="'/sellers/preview/' + p.id" class="pend-card">
+                                <img v-if="p.image" :src="p.image" alt=""><div v-else class="pend-noimg">No photo</div>
+                                <div class="pend-body">
+                                    <div class="fw-semibold text-truncate">{{ p.name }}</div>
+                                    <div class="small text-muted">{{ money(p.sale_price != null ? p.sale_price : p.price) }} · {{ p.colors }} colour(s) · {{ p.stock }} pcs</div>
+                                    <div class="small text-muted">{{ (p.created_at || '').slice(0, 10) }}</div>
+                                </div>
+                            </router-link>
+                        </div>
+                    </div></div>
+                </template>
+            </div>
+
+            <div v-else class="list-surface p-3">
                 <p class="text-muted small">
                     Consignment sellers supply products that Lebazone stocks, sells and delivers. Applications from the website's
                     "Sell on Lebazone" page appear here as <b>Pending</b>. Sellers are credited (sale − commission) once an item is
@@ -159,9 +175,19 @@ export default {
     data() {
         return { sellers: [], filter: '', current: null, form: {}, detail: { balance: 0, ledger: [], products: [] },
             payout: { amount: '', note: '' }, search: '', results: [], busy: false,
-            login: { email: '', password: '' }, pending: [], delAllArmed: false };
+            login: { email: '', password: '' }, pending: [], delAllArmed: false,
+            tab: (this.$route.query.tab === 'pending' || this.$route.query.approvals) ? 'pending' : 'sellers' };
     },
     computed: {
+        pendingBySeller() {
+            const map = new Map();
+            for (const p of this.pending) {
+                const k = p.seller_id || 0;
+                if (!map.has(k)) map.set(k, { id: k, name: p.seller || 'Unknown seller', items: [] });
+                map.get(k).items.push(p);
+            }
+            return [...map.values()].sort((a, b) => a.name.localeCompare(b.name));
+        },
         filtered() { return this.filter ? this.sellers.filter(s => s.status === this.filter) : this.sellers; },
     },
     created() { this.load(); this.loadPending(); },
@@ -185,6 +211,14 @@ export default {
         loadPending() { axios.get(this.$apiUrl + '/sellers/pending_products').then(r => { this.pending = r.data.data || []; }).catch(() => {}); },
         saveLogin() {
             this.post('/sellers/save_login', { seller_id: this.form.id, email: this.login.email, password: this.login.password }, () => { this.loadDetail(); });
+        },
+        setTab(t) {
+            this.tab = t;
+            this.$router.replace({ query: t === 'pending' ? { tab: 'pending' } : {} }).catch(() => {});
+        },
+        deleteGroup(g) {
+            if (!window.confirm('Delete all ' + g.items.length + ' waiting product(s) from ' + g.name + '? This cannot be undone.')) return;
+            this.post('/sellers/delete_pending', { product_ids: g.items.map(p => p.id).join(',') }, () => { this.loadPending(); this.load(); });
         },
         deleteAllPending() {
             if (!this.delAllArmed) { this.delAllArmed = true; setTimeout(() => { this.delAllArmed = false; }, 4000); return; }
@@ -220,3 +254,12 @@ export default {
     },
 };
 </script>
+
+<style scoped>
+.pend-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+.pend-card { display: flex; gap: 10px; align-items: center; border: 1px solid #E5E7EB; border-radius: 10px; padding: 8px; color: inherit; text-decoration: none; }
+.pend-card:hover { border-color: #DC2626; }
+.pend-card img, .pend-noimg { width: 60px; height: 60px; border-radius: 8px; object-fit: cover; flex-shrink: 0; }
+.pend-noimg { display: flex; align-items: center; justify-content: center; font-size: 11px; background: #FEF2F2; color: #B91C1C; text-align: center; }
+.pend-body { min-width: 0; }
+</style>

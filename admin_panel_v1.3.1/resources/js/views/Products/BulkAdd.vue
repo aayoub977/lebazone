@@ -83,6 +83,7 @@
                                 <span v-if="g.state === 'saved'" class="text-success fw-semibold">Saved ✓ {{ g.code }}</span>
                                 <span v-else-if="g.state === 'saving'" class="text-info">Saving…</span>
                                 <span v-else-if="g.errors.length" class="text-danger">{{ g.errors.join(' · ') }}</span>
+                                <span v-else-if="photosMissingForSeller(g)" class="text-danger">Choose its photos in step 3</span>
                                 <span v-else class="text-muted">Ready</span>
                             </td>
                         </tr>
@@ -117,7 +118,7 @@ export default {
             for (const r of this.rows) for (const n of r.photos) if (!this.fileFor(n) && !out.includes(n)) out.push(n);
             return out;
         },
-        ready() { return this.groups.filter(g => g.state !== 'saved' && !g.errors.length); },
+        ready() { return this.groups.filter(g => g.state !== 'saved' && !g.errors.length && !this.photosMissingForSeller(g)); },
         blocked() { return this.groups.filter(g => g.state !== 'saved' && g.errors.length).length; },
         savedCount() { return this.groups.filter(g => g.state === 'saved').length; },
     },
@@ -159,6 +160,12 @@ export default {
             this.groups = [...map.values()].map(g => {
                 const errs = [];
                 g.rows.forEach(r => r.errors.forEach(x => errs.push((g.rows.length > 1 ? 'row ' + r.row + ': ' : '') + x)));
+                if (this.$can('seller_portal')) { // Custom (Lebazone): sellers send complete products
+                    const first = g.rows[0];
+                    if ((first.description || '').trim().length < 20) errs.push('Description must be at least 20 characters');
+                    if (!g.rows.some(r => r.photos.length)) errs.push('Add at least one photo name in the Photos column');
+                    if (g.rows.some(r => !(r.stock >= 1))) errs.push('Quantity must be at least 1 for every row');
+                }
                 if (g.rows.length > 1) {
                     const cols = g.rows.map(r => key(r.color));
                     if (cols.some(c => !c)) errs.push('several rows with this name - give each a Colour');
@@ -166,6 +173,10 @@ export default {
                 }
                 return { ...g, errors: errs };
             });
+        },
+        // a seller's product must have its photos actually chosen, not only named
+        photosMissingForSeller(g) {
+            return this.$can('seller_portal') && !g.rows.some(r => r.photos.some(n => this.fileFor(n)));
         },
         fileFor(name) { return this.files[key(name)] || this.files['~' + stem(name)] || null; },
         photoUrl(name) { const f = this.fileFor(name); return f ? f.url : ''; },

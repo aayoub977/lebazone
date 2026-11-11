@@ -16,7 +16,7 @@
         <div class="card mb-3"><div class="card-body">
             <div class="d-flex flex-wrap gap-2">
                 <input ref="scan" v-model="code" class="form-control form-control-lg" style="flex:1;min-width:220px" autocomplete="off"
-                    :placeholder="receiveMode ? 'Scan the product you received… · امسح المنتج' : 'Scan a barcode or type it + Enter · امسح الباركود'"
+                    :placeholder="receiveMode ? 'Scan the product you received… · امسح المنتج' : 'Scan a barcode, or type a product name + Enter · امسح الباركود أو اكتب الاسم'"
                     @keydown.enter.prevent="lookup">
                 <CameraScanner big @scan="c => { code = c; lookup(); }" />
             </div>
@@ -100,7 +100,9 @@
         <b-modal v-model="showNew" title="New product · منتج جديد" size="lg" centered @hidden="focusScan" @shown="focusName">
             <div class="small text-muted mb-3">
                 <template v-if="form.barcode">Barcode <code>{{ form.barcode }}</code> - no labels needed ·
-                    <a href="#" @click.prevent="switchToExisting">it's a new colour of a product I already have →</a></template>
+                    <a href="#" @click.prevent="switchToExisting">it's a new colour of a product I already have →</a>
+                    <div class="mt-2"><button type="button" class="btn btn-sm btn-outline-primary" @click="openLink(form.barcode)">
+                        🔗 This product is already in Lebazone (added from the admin panel) - link this barcode to it</button></div></template>
                 <template v-else><b>No barcode</b> - Lebazone creates one and prints labels to stick on the items.</template></div>
             <div v-if="isSeller" class="alert alert-info py-2 small">Your product goes on the shop after Lebazone checks and approves it. Enter your selling price - Lebazone's commission comes out of it.</div>
 
@@ -124,6 +126,9 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Custom (Lebazone): cost from weight (staff only - sellers set their own price) -->
+            <WeightCost v-if="!isSeller" v-model="form.weight_g" class="mt-3" @apply="applyWeightCost" />
 
             <!-- Custom (Lebazone): more photos (gallery) -->
             <label class="form-label fw-bold mt-3 mb-1">Photos · الصور <span class="small text-muted fw-normal">— up to 10; tap ☆ to choose the main photo</span></label>
@@ -167,6 +172,13 @@
                 <option v-for="c in opts.categories" :key="c.id" :value="c.id">{{ c.name }}</option>
             </select>
 
+            <!-- Custom (Lebazone): sellers must describe the product - shown open, required -->
+            <div v-if="isSeller" class="mt-3">
+                <label class="form-label fw-bold mb-1" for="sl-seller-desc">Description · الوصف * <span class="small text-muted fw-normal">— at least 20 characters: what it is, specs, what's in the box</span></label>
+                <textarea id="sl-seller-desc" v-model="form.description" rows="3" class="form-control" :class="{ 'is-invalid': sellerTried && descShort }"
+                    placeholder="e.g. Original Anker 20000mAh power bank, 22.5W fast charging, USB-C in/out. In the box: power bank + cable."></textarea>
+                <div class="small mt-1" :class="descShort ? 'text-danger' : 'text-success'">{{ descLen }} / 20 characters minimum</div>
+            </div>
             <details class="sl-more mt-3" :open="moreOpen" @toggle="moreOpen = $event.target.open">
                 <summary>More details (optional) · تفاصيل إضافية</summary>
                 <div class="row mt-2">
@@ -177,7 +189,7 @@
                     <div v-if="!isSeller" class="col-4 mb-2"><label class="form-label small">Cost $ (private)</label><input v-model="form.cost" type="number" min="0" step="0.01" class="form-control"></div>
                     <div class="col-4 mb-2"><label class="form-label small">Warranty</label>
                         <select v-model="form.warranty" class="form-select"><option v-for="w in warranties" :key="w" :value="w">{{ w }}</option></select></div>
-                    <div class="col-12 mb-2"><label class="form-label small">Description</label><textarea v-model="form.description" rows="2" class="form-control" placeholder="Key specs, what's in the box"></textarea></div>
+                    <div v-if="!isSeller" class="col-12 mb-2"><label class="form-label small">Description</label><textarea v-model="form.description" rows="2" class="form-control" placeholder="Key specs, what's in the box"></textarea></div>
                 </div>
                 <div class="fw-bold small mt-1">More colours of this product</div>
                 <div v-for="(c, i) in form.colors.slice(1)" :key="i" class="row g-2 align-items-end mb-2">
@@ -214,6 +226,22 @@
                         <img :src="g.url" alt=""><span class="sl-thumb-star">☆ Make main</span></button>
                 </div>
             </template>
+        </b-modal>
+
+        <!-- Custom (Lebazone): attach a scanned barcode to a product that was added from the admin panel -->
+        <b-modal v-model="showLink" title="Link barcode to a product · ربط الباركود" centered hide-footer @hidden="focusScan">
+            <p class="small mb-2">Barcode <code>{{ link.code }}</code> - find the product, then tap the colour this box belongs to.</p>
+            <input v-model="link.q" class="form-control mb-2" placeholder="Type part of the product name · اكتب جزءاً من الاسم" @input="searchLink">
+            <div v-if="link.q.trim().length >= 2 && !link.results.length && !link.loading" class="small text-muted">No product found.</div>
+            <div v-for="p in link.results" :key="'lk' + p.id" class="border rounded p-2 mb-2">
+                <div class="fw-semibold mb-1">{{ p.name }} <span v-if="p.review === 'pending'" class="badge bg-warning text-dark">waiting for approval</span></div>
+                <div class="d-flex flex-wrap gap-2">
+                    <button v-for="v in p.variants" :key="'lv' + v.id" type="button" class="btn btn-sm" :class="v.barcode ? 'btn-outline-secondary' : 'btn-outline-primary'"
+                        :disabled="busy" @click="linkTo(v)">
+                        <img v-if="v.image" :src="v.image" alt="" style="width:22px;height:22px;object-fit:cover;border-radius:4px" class="me-1">
+                        {{ v.color }}<small v-if="v.barcode" class="text-muted"> · has {{ v.barcode }}</small></button>
+                </div>
+            </div>
         </b-modal>
 
         <b-modal v-model="showAddColor" title="Add a colour · لون جديد" centered @hidden="focusScan">
@@ -282,10 +310,11 @@
 <script>
 import axios from 'axios';
 import CameraScanner from '../../components/CameraScanner.vue';
+import WeightCost from '../../components/WeightCost.vue';
 import { printProductLabels } from '../../utils/warehousePrint.js';
 
 const blankForm = () => ({ barcode: '', name: '', name_ar: '', category_id: '', brand_id: '', price: '', sale_price: '', cost: '',
-    warranty: '1 year', description: '', photo: null, size: '', colors: [{ color: '', barcode: '', stock: 1 }] });
+    warranty: '1 year', description: '', photo: null, size: '', weight_g: 0, colors: [{ color: '', barcode: '', stock: 1 }] });
 
 const SIZES = [
     { key: 'S', hint: 'cable, case, charger' },
@@ -338,13 +367,14 @@ async function shrinkImage(file, max = 1600, quality = 0.85) {
 const store = { get: (k, d) => { try { return localStorage.getItem(k) || d; } catch (e) { return d; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} } };
 
 export default {
-    components: { CameraScanner },
+    components: { CameraScanner, WeightCost },
     data() {
         return {
             code: '', busy: false, receiveMode: false, products: [], recent: [], flash: null, SIZES, missing: { count: 0, products: [] },
             opts: { categories: [], brands: [], colors: [], app_name: 'Lebazone' },
             warranties: ['No warranty', '1 month', '3 months', '6 months', '1 year', '2 years'],
-            showNew: false, form: blankForm(), photoUrl: '', morePhotos: [], mainPhoto: 0, preparing: 0, showPhotos: false, photosFor: { p: null, v: null }, catGuessed: false, catTouched: false, moreOpen: false,
+            showNew: false, form: blankForm(), photoUrl: '', morePhotos: [], mainPhoto: 0, preparing: 0, sellerTried: false,
+            showLink: false, link: { code: '', q: '', results: [], loading: false }, showPhotos: false, photosFor: { p: null, v: null }, catGuessed: false, catTouched: false, moreOpen: false,
             showAddColor: false, addColor: { product: null, color: '', barcode: '', stock: 1, price: '', sale_price: '', photo: null },
             searchTerm: '', searchResults: [],
             showPick: false, pick: { mode: 'label', title: '', question: '', variants: [], selected: null, product: null, copies: 1 },
@@ -355,6 +385,8 @@ export default {
         topColors() { return (this.opts.colors || []).slice(0, 10); },
         // Custom (Lebazone): a consignment seller's login - their products wait for Lebazone's approval
         isSeller() { return this.$can('seller_portal'); },
+        descLen() { return (this.form.description || '').trim().length; },
+        descShort() { return this.descLen < 20; },
         // Custom (Lebazone): labels are only needed for colours without their own barcode.
         newNeedsLabels() {
             const f = this.form;
@@ -503,6 +535,16 @@ export default {
                 this.code = '';
                 if (!d.found) {
                     if (this.receiveMode) { this.say(false, 'Barcode ' + code + ' is not in the shop yet — switch to "Add / find" to add it.'); return; }
+                    // Custom (Lebazone): typed words (not a barcode) = find products by name
+                    if (/[a-z\u0600-\u06ff]/i.test(code) && /\s|[a-z\u0600-\u06ff]{3,}/i.test(code) && !/^[A-Z]{3}[-0-9]/.test(code)) {
+                        axios.get(this.$apiUrl + '/scan/search', { params: { q: code } }).then(rs => {
+                            const list = rs.data.data || [];
+                            if (!list.length) return this.say(false, 'No product named "' + code + '"');
+                            this.products = list;
+                            this.say(true, list.length + ' product(s) matching "' + code + '" - tap "add box barcode" to link a barcode');
+                        });
+                        return;
+                    }
                     this.form = blankForm();
                     this.form.barcode = code;
                     this.form.colors[0].barcode = code;
@@ -529,11 +571,18 @@ export default {
             if (!(+f.price > 0)) return this.showError('Enter the price');
             if (!f.category_id) return this.showError('Choose a category');
             if (!f.size) return this.showError('Choose the size: S, M, L or XL');
+            if (this.isSeller) { // Custom (Lebazone): sellers send complete products
+                this.sellerTried = true;
+                if (!this.morePhotos.length) return this.showError('Add at least one photo of the product');
+                if (this.descShort) return this.showError('Write a description of at least 20 characters');
+                const all = [f.colors[0], ...f.colors.slice(1).filter(c => (c.color || '').trim())];
+                if (all.some(c => !(+c.stock >= 1))) return this.showError('Enter how many pieces you have of every colour (at least 1)');
+            }
             const extra = f.colors.slice(1).filter(c => (c.color || '').trim());
             if (extra.length && !(f.colors[0].color || '').trim()) return this.showError('You added more colours — choose the colour of the first one too');
             const colors = [f.colors[0], ...extra];
             const fd = new FormData();
-            ['name', 'name_ar', 'category_id', 'brand_id', 'price', 'sale_price', 'cost', 'warranty', 'description', 'size'].forEach(k => fd.append(k, f[k] ?? ''));
+            ['name', 'name_ar', 'category_id', 'brand_id', 'price', 'sale_price', 'cost', 'warranty', 'description', 'size', 'weight_g'].forEach(k => fd.append(k, f[k] ?? ''));
             fd.append('colors', JSON.stringify(colors));
             // the photo marked ★ Main is the product picture, the others its gallery
             this.morePhotos.forEach((m, i) => fd.append(i === this.mainPhoto ? 'photo' : 'photos[]', m.file));
@@ -603,6 +652,41 @@ export default {
             }).catch(this.fail).finally(() => { this.busy = false; });
         },
 
+        // Custom (Lebazone): cost from weight -> the Cost field (and the price when asked)
+        applyWeightCost({ cost, price }) {
+            this.form.cost = cost;
+            if (price) this.form.price = price;
+            this.moreOpen = true; // the Cost field sits under "More details"
+            this.say(true, 'Cost $' + cost.toFixed(2) + (price ? ' and price $' + price.toFixed(2) : '') + ' filled in');
+        },
+        // Custom (Lebazone): link a new barcode to an existing product (e.g. added from the admin panel)
+        openLink(code) {
+            this.showNew = false;
+            this.link = { code, q: '', results: [], loading: false };
+            this.showLink = true;
+        },
+        searchLink() {
+            const q = this.link.q.trim();
+            if (q.length < 2) { this.link.results = []; return; }
+            this.link.loading = true;
+            clearTimeout(this._linkT);
+            this._linkT = setTimeout(() => {
+                axios.get(this.$apiUrl + '/scan/search', { params: { q } }).then(r => {
+                    if (this.link.q.trim() === q) this.link.results = r.data.data || [];
+                }).finally(() => { this.link.loading = false; });
+            }, 300);
+        },
+        linkTo(v) {
+            if (v.barcode && !window.confirm(v.color + ' already has barcode ' + v.barcode + '. Replace it with ' + this.link.code + '?')) return;
+            this.busy = true;
+            axios.post(this.$apiUrl + '/scan/set_barcode', { variant_id: v.id, barcode: this.link.code }).then(r => {
+                if (r.data.status !== 1) return this.showError(r.data.message);
+                this.products = [r.data.data];
+                this.showLink = false;
+                this.say(true, 'Barcode ' + this.link.code + ' saved on ' + v.color + ' ✓ - scanning it now opens this product');
+                this.loadRecent();
+            }).catch(this.fail).finally(() => { this.busy = false; });
+        },
         setBarcode(v) {
             const bc = window.prompt('Scan or type the box barcode for ' + v.color);
             if (!bc) return;

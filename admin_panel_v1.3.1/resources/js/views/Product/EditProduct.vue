@@ -817,6 +817,9 @@
                                                         :placeholder="__('search_store')" />
                                                 </div>
 
+                                                <!-- Custom (Lebazone): cost from weight -> purchase price (and suggested price) in every store -->
+                                                <WeightCost v-model="lbzWeight" small class="mb-3" @apply="e => applyWeightCost(v, e)" />
+
                                                 <!-- Fill every other store from the first card — most catalogues
                                                      price/stock identically across stores. -->
                                                 <div class="mb-3" v-if="channelStores.length > 1">
@@ -1103,6 +1106,7 @@ import TranslationHelper from '../../mixins/TranslationHelper.js';
 import CountryZoneFilter from '../../mixins/CountryZoneFilter.js';
 import UnsavedChanges from '../../mixins/UnsavedChanges.js';
 import AttributeEdit from '../Category/Attributes/Edit.vue';
+import WeightCost from '../../components/WeightCost.vue';
 import CategoryEdit from '../Category/Edit.vue';
 import BrandEdit from './Brands/Edit.vue';
 import DatePicker from '../../components/DatePicker.vue';
@@ -1110,7 +1114,7 @@ import MediaPicker from '../../components/MediaPicker.vue';
 import { ArrowLeft, ArrowRight, Plus, Pencil, Sparkles, Info, Copy, Save, Zap, X, LoaderCircle, Image as ImageIcon } from 'lucide-vue-next';
 
 export default {
-    components: { AttributeEdit, CategoryEdit, BrandEdit, editor: Editor, DatePicker, MediaPicker, ArrowLeft, ArrowRight, Plus, Pencil, Sparkles, Info, Copy, Save, Zap, X, LoaderCircle, ImageIcon },
+    components: { WeightCost, AttributeEdit, CategoryEdit, BrandEdit, editor: Editor, DatePicker, MediaPicker, ArrowLeft, ArrowRight, Plus, Pencil, Sparkles, Info, Copy, Save, Zap, X, LoaderCircle, ImageIcon },
     mixins: [TranslationHelper, CountryZoneFilter, UnsavedChanges],
     data() {
         return {
@@ -1154,6 +1158,7 @@ export default {
             categoryAttributes: [],
             // Custom (Lebazone): attributes picked for this product on top of the category's
             schemaAttributes: [],
+            lbzWeight: 0, // Custom (Lebazone): grams, for the cost-from-weight helper
             allAttributes: [],
             allAttributesLoaded: false,
             extraAttrIds: [],
@@ -1494,6 +1499,7 @@ export default {
         czOnFilter() { this.fetchChannelStores(); },
         bootstrap() {
             this._skuBase = null; // Custom (Lebazone): new random SKU code per product
+            this.loadLbzWeight();
             this.isLoadingData = true;
             Promise.all([
                 this.fetchActiveLanguages(),
@@ -2615,6 +2621,26 @@ export default {
                 v.gallery_previews.push(URL.createObjectURL(f));
             }
         },
+        // Custom (Lebazone): cost from weight -> this variant's purchase price (and price) in every store
+        applyWeightCost(v, { cost, price }) {
+            for (const st of (this.channelStores || [])) {
+                const row = this.storeStock(v, st.id);
+                row.purchase_price = cost;
+                if (price) row.price = price;
+            }
+            this.saveLbzWeight();
+            this.showMessage('success', 'Cost $' + cost.toFixed(2) + (price ? ' and price $' + price.toFixed(2) : '') + ' filled in for every store');
+        },
+        saveLbzWeight() {
+            if (!this.id || !(this.lbzWeight >= 0)) return;
+            axios.post(this.$apiUrl + '/scan/set_weight', { product_id: this.id, weight_g: this.lbzWeight || 0 }).catch(() => {});
+        },
+        loadLbzWeight() {
+            if (!this.id) return;
+            axios.get(this.$apiUrl + '/scan/product', { params: { id: this.id } }).then(r => {
+                if (r.data.status === 1 && r.data.data) this.lbzWeight = +r.data.data.weight_g || 0;
+            }).catch(() => {});
+        },
         // Custom (Lebazone): the gallery photo and the main photo swap places, saved straight away.
         makeGalleryMain(vIdx, gIdx) {
             const v = this.variants[vIdx];
@@ -2978,6 +3004,9 @@ export default {
                     this.showError(data.message || __('something_went_wrong'));
                     return;
                 }
+                // Custom (Lebazone): keep the weight with the product (new products get their id here)
+                const savedId = (data.data && data.data.id) ? Number(data.data.id) : this.id;
+                if (savedId && this.lbzWeight > 0) axios.post(this.$apiUrl + '/scan/set_weight', { product_id: savedId, weight_g: this.lbzWeight }).catch(() => {});
                 // Mark clean so the post-save redirect doesn't trip the unsaved-changes guard.
                 this.captureFormBaseline();
                 this.showMessage('success', __(successMessageKey));

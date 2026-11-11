@@ -151,12 +151,13 @@ class SellersApiController extends Controller
     public function pendingProducts()
     {
         $rows = Product::where('seller_review', 'pending')->with('translations')->orderBy('id')->limit(200)
-            ->get(['id', 'name', 'seller_id', 'seller_review'])
+            ->get(['id', 'name', 'seller_id', 'seller_review', 'created_at'])
             ->map(function ($p) {
                 $v = \App\Models\ProductVariant::where('product_id', $p->id)->orderBy('sort_order')->orderBy('id')->first();
                 $st = $v ? DB::table('product_variant_store_stocks')->where('product_variant_id', $v->id)->first() : null;
-                return ['id' => $p->id, 'name' => (string) $p->name,
+                return ['id' => $p->id, 'name' => (string) $p->name, 'seller_id' => (int) $p->seller_id,
                     'seller' => (string) DB::table('sellers')->where('id', $p->seller_id)->value('business_name'),
+                    'created_at' => (string) $p->created_at,
                     'image' => $v && $v->image ? asset('storage/' . $v->image) : '',
                     'colors' => \App\Models\ProductVariant::where('product_id', $p->id)->count(),
                     'price' => $st ? (float) $st->price : null, 'sale_price' => $st ? (float) $st->discounted_price : null,
@@ -181,6 +182,50 @@ class SellersApiController extends Controller
             $n++;
         }
         return CommonHelper::responseSuccess($n === 1 ? '1 product deleted' : "$n products deleted");
+    }
+
+    /** Custom (Lebazone): everything the admin needs to see a pending product the way the shop will show it. */
+    public function previewProduct(Request $request)
+    {
+        $p = Product::with(['translations', 'category', 'brand'])->find((int) $request->input('id'));
+        if (!$p) return CommonHelper::responseError('Product not found');
+        $def = app(\App\Services\LanguageService::class)->getDefaultLanguage();
+        $tr = $p->translations->firstWhere('language_id', $def->id ?? 0) ?? $p->translations->first();
+        $arTr = $p->translations->first(fn ($t) => (int) $t->language_id !== (int) ($def->id ?? 0) && trim((string) $t->name) !== '');
+        $colorAttr = DB::table('attributes')->whereNull('deleted_at')->where(function ($q) {
+            $q->where('slug', 'color')->orWhere('slug', 'like', 'color-%')->orWhereIn(DB::raw('LOWER(name)'), ['color', 'colour']);
+        })->pluck('id');
+        $variants = [];
+        foreach (\App\Models\ProductVariant::where('product_id', $p->id)->orderBy('sort_order')->orderBy('id')->get() as $v) {
+            $st = DB::table('product_variant_store_stocks')->where('product_variant_id', $v->id)->first();
+            $vals = DB::table('product_variant_attribute_values as pv')->join('attribute_values as av', 'av.id', '=', 'pv.attribute_value_id')
+                ->where('pv.product_variant_id', $v->id)->get(['pv.attribute_id', 'av.value']);
+            $color = (string) ($vals->first(fn ($x) => $colorAttr->contains($x->attribute_id))->value ?? '');
+            $variants[] = [
+                'id' => (int) $v->id, 'name' => (string) $v->name, 'sku' => (string) $v->sku, 'barcode' => (string) ($v->barcode ?? ''),
+                'color' => $color, 'options' => $vals->pluck('value')->implode(' / '),
+                'image' => $v->image ? asset('storage/' . $v->image) : '',
+                'gallery' => DB::table('product_images')->where('product_variant_id', $v->id)->orderBy('id')->pluck('image')->map(fn ($i) => asset('storage/' . $i))->values(),
+                'price' => $st ? (float) $st->price : null, 'sale_price' => $st ? (float) $st->discounted_price : null,
+                'cost' => $st ? (float) $st->purchase_price : null, 'stock' => $st ? (int) $st->available : 0,
+            ];
+        }
+        $seller = $p->seller_id ? Seller::find($p->seller_id) : null;
+        return CommonHelper::responseWithData([
+            'id' => (int) $p->id,
+            'name' => (string) ($tr->name ?? $p->name),
+            'name_ar' => (string) ($arTr->name ?? ''),
+            'description' => (string) ($tr->description ?? ''),
+            'category' => (string) ($p->category->name ?? ''),
+            'brand' => (string) ($p->brand->name ?? ''),
+            'size' => (string) ($p->lbz_size ?? ''),
+            'status' => (int) $p->status,
+            'review' => (string) ($p->seller_review ?? ''),
+            'review_note' => (string) ($p->seller_review_note ?? ''),
+            'created_at' => (string) $p->created_at,
+            'seller' => $seller ? ['id' => (int) $seller->id, 'name' => (string) $seller->business_name, 'commission' => (float) $seller->commission_percent, 'status' => $seller->status] : null,
+            'variants' => $variants,
+        ]);
     }
 
     /** Approve (goes live) or reject (stays hidden, the seller sees the reason). */

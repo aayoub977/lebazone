@@ -298,6 +298,7 @@ Route::middleware(['auth:api', 'store.scope'])->group(function () {
         Route::get('pending_products', [SellersApiController::class, 'pendingProducts']);
         Route::post('review_product', [SellersApiController::class, 'reviewProduct']);
         Route::post('delete_pending', [SellersApiController::class, 'deletePending']);
+        Route::get('preview_product', [SellersApiController::class, 'previewProduct']);
     });
 
     // Custom (Hader): Aramex shipping
@@ -357,6 +358,9 @@ Route::middleware(['auth:api', 'store.scope'])->group(function () {
         Route::get('missing_size', [ScanApiController::class, 'missingSize']);
         Route::get('bulk_sample', [ScanApiController::class, 'bulkSample']); // Custom (Lebazone): Excel bulk upload
         Route::post('bulk_parse', [ScanApiController::class, 'bulkParse']);
+        Route::get('cost_settings', [ScanApiController::class, 'costSettings']); // Custom (Lebazone): cost from weight
+        Route::post('cost_settings', [ScanApiController::class, 'saveCostSettings']);
+        Route::post('set_weight', [ScanApiController::class, 'setWeight']);
     });
 
     // Custom (Hader): loyalty programme settings

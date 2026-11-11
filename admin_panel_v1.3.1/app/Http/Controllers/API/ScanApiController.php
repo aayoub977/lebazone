@@ -199,6 +199,38 @@ class ScanApiController extends ProductApisController
         return CommonHelper::responseError('Product not found');
     }
 
+    // ---------------- Custom (Lebazone): cost from weight ----------------
+
+    /** Cost per kg ($) and profit margin (%) used to fill in an item's cost and a suggested price. */
+    public function costSettings()
+    {
+        return CommonHelper::responseWithData([
+            'cost_per_kg' => (float) (\App\Models\Setting::get_value('lbz_cost_per_kg') ?: 0),
+            'margin_percent' => (float) (\App\Models\Setting::get_value('lbz_margin_percent') ?: 0),
+        ]);
+    }
+
+    public function saveCostSettings(Request $request)
+    {
+        if ($this->currentSellerId() !== null) return CommonHelper::responseError('Not allowed for your account');
+        $kg = (float) $request->input('cost_per_kg', 0);
+        $margin = (float) $request->input('margin_percent', 0);
+        if ($kg < 0 || $margin < 0 || $margin > 1000) return CommonHelper::responseError('Enter positive numbers');
+        DB::table('settings')->updateOrInsert(['variable' => 'lbz_cost_per_kg'], ['value' => (string) round($kg, 4)]);
+        DB::table('settings')->updateOrInsert(['variable' => 'lbz_margin_percent'], ['value' => (string) round($margin, 2)]);
+        return CommonHelper::responseSuccess('Saved');
+    }
+
+    /** Save an item's weight (grams) - used by the admin product form. */
+    public function setWeight(Request $request)
+    {
+        $id = (int) $request->input('product_id');
+        if (!Product::where('id', $id)->exists() || !$this->ownsProduct($id)) return CommonHelper::responseError('Product not found');
+        $g = max(0, (int) round((float) $request->input('weight_g', 0)));
+        if (Schema::hasColumn('products', 'lbz_weight_g')) DB::table('products')->where('id', $id)->update(['lbz_weight_g' => $g ?: null]);
+        return CommonHelper::responseSuccess('Weight saved');
+    }
+
     /** Product with its colours, as the screen shows it. */
     private function payload(int $productId, ?string $matchedCode = null): array
     {
@@ -236,6 +268,7 @@ class ScanApiController extends ProductApisController
         return [
             'id' => $product->id,
             'review' => (string) ($product->seller_review ?? ''), // Custom (Lebazone): pending / rejected for seller products
+            'weight_g' => (int) ($product->lbz_weight_g ?? 0),
             'review_note' => (string) ($product->seller_review_note ?? ''),
             'name' => $name,
             'category' => Category::where('id', $product->category_id)->value('name'),
@@ -452,8 +485,15 @@ class ScanApiController extends ProductApisController
     {
         $term = trim((string) $request->input('q', ''));
         if (mb_strlen($term) < 2) return CommonHelper::responseWithData([]);
-        $ids = ProductVariant::where('name', 'like', "%$term%")->orWhere('sku', $term)
-            ->orderByDesc('id')->limit(60)->pluck('product_id')->unique()->values();
+        // Custom (Lebazone): also the product's own name (products added in the admin panel name
+        // their colours "Gold / Large", so the colour name alone does not find them)
+        $like = '%' . str_replace(['%', '_'], ['\\%', '\\_'], $term) . '%';
+        $ids = ProductVariant::where('name', 'like', $like)->orWhere('sku', $term)
+            ->orderByDesc('id')->limit(60)->pluck('product_id')
+            ->merge(DB::table('products')->whereNull('deleted_at')->where('name', 'like', $like)->orderByDesc('id')->limit(60)->pluck('id'))
+            ->merge(Schema::hasTable('product_translations')
+                ? DB::table('product_translations')->where('name', 'like', $like)->orderByDesc('product_id')->limit(60)->pluck('product_id') : collect())
+            ->map(fn ($x) => (int) $x)->unique()->sortDesc()->values();
         $ids = $this->ownedOnly($ids)->take(10);
         return CommonHelper::responseWithData($ids->map(fn ($id) => $this->payload((int) $id))->values());
     }
@@ -500,6 +540,19 @@ class ScanApiController extends ProductApisController
         if (!in_array($size, self::SIZES, true)) return CommonHelper::responseError('Choose the size: S, M, L or XL');
         $shop = $this->shop();
         if (!$shop) return CommonHelper::responseError('No active store found');
+        if ($sellerId) {
+            // Custom (Lebazone): sellers must send a complete product - Lebazone checks it before it goes live
+            $missing = [];
+            if (!$request->hasFile('photo') && !$request->hasFile('photos') && !$request->hasFile('photo_0')) $missing[] = 'at least one photo';
+            if (mb_strlen(trim(strip_tags((string) $request->input('description', '')))) < 20) $missing[] = 'a description (at least 20 characters)';
+            foreach (array_values($colors) as $i => $c) {
+                if ((int) ($c['stock'] ?? 0) < 1) { $missing[] = 'the quantity of every colour (at least 1)'; break; }
+            }
+            if (count($colors) > 1) {
+                foreach ($colors as $c) if (trim((string) ($c['color'] ?? '')) === '') { $missing[] = 'the colour name of every colour'; break; }
+            }
+            if ($missing) return CommonHelper::responseError('Please add ' . implode(', ', $missing) . ' - Lebazone needs full details to approve your product');
+        }
 
         foreach ($colors as $c) {
             $bc = trim((string) ($c['barcode'] ?? ''));
@@ -562,6 +615,9 @@ class ScanApiController extends ProductApisController
         }
         $productId = (int) ProductVariant::where('sku', array_key_first($barcodes))->value('product_id');
         if (Schema::hasColumn('products', 'lbz_size')) DB::table('products')->where('id', $productId)->update(['lbz_size' => $size]);
+        if ($request->filled('weight_g') && Schema::hasColumn('products', 'lbz_weight_g')) {
+            DB::table('products')->where('id', $productId)->update(['lbz_weight_g' => max(0, (int) round((float) $request->input('weight_g'))) ?: null]);
+        }
         if ($sellerId) {
             // a seller's product stays off the shop until Lebazone approves it
             DB::table('products')->where('id', $productId)->update(['seller_id' => $sellerId, 'status' => 0, 'seller_review' => 'pending', 'seller_review_note' => null]);
@@ -712,6 +768,7 @@ class ScanApiController extends ProductApisController
             return CommonHelper::responseError("Barcode $bc already belongs to another product");
         }
         $v->barcode = $bc !== '' ? $bc : null;
+        if (trim((string) $v->sku) === '') $v->sku = $this->nextCode(); // Custom (Lebazone): a Lebazone code for items that had none
         $v->save();
         return CommonHelper::responseSuccessWithData('Barcode saved', $this->payload($v->product_id, $bc));
     }

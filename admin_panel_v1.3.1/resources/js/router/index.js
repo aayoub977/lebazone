@@ -62,6 +62,7 @@ const OrderStation = () => import("../views/Warehouse/OrderStation.vue"); // Cus
 const AramexSettings = () => import("../views/Shipping/AramexSettings.vue"); // Custom (Hader)
 const Sellers = () => import("../views/Sellers/Sellers.vue"); // Custom (Hader)
 const SellerPortal = () => import("../views/Sellers/SellerPortal.vue"); // Custom (Lebazone)
+const SellerProductPreview = () => import("../views/Sellers/SellerProductPreview.vue"); // Custom (Lebazone)
 const Purchasing = () => import("../views/Purchasing/Purchasing.vue"); // Custom (Lebazone): import costing
 const SpinWheel = () => import("../views/SpinWheel/SpinWheel.vue");
 const SpinWheelForm = () => import("../views/SpinWheel/SpinWheelForm.vue");
@@ -742,6 +743,16 @@ function configRoutes() {
                         permission: 'seller_portal',
                         role: adminRoles,
                         title: 'My shop'
+                    },
+                },
+                {
+                    path: "sellers/preview/:id",
+                    name: "seller-product-preview",
+                    component: SellerProductPreview,
+                    meta: {
+                        permission: 'product_list',
+                        role: adminRoles,
+                        title: 'Product preview'
                     },
                 },
                 {
