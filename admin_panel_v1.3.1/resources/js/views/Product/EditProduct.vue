@@ -2634,7 +2634,6 @@ export default {
                 if (price) row.price = price;
             }
             this.saveLbzWeight();
-            this.showMessage('success', 'Cost $' + cost.toFixed(2) + (price ? ' and price $' + price.toFixed(2) : '') + ' filled in for every store');
         },
         saveLbzWeight() {
             if (!this.id || !(this.lbzWeight >= 0)) return;

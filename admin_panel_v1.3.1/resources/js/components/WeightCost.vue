@@ -6,7 +6,7 @@
                 <label class="form-label small fw-bold mb-1" :for="'wc-' + uid">Weight · الوزن</label>
                 <div class="input-group" :class="small ? 'input-group-sm' : ''" style="max-width: 190px">
                     <input :id="'wc-' + uid" type="number" min="0" step="1" inputmode="numeric" class="form-control"
-                        :value="modelValue || ''" @input="$emit('update:modelValue', +$event.target.value || 0)" placeholder="e.g. 250">
+                        :value="modelValue || ''" @input="onWeight" placeholder="e.g. 250">
                     <span class="input-group-text">g</span>
                 </div>
             </div>
@@ -14,14 +14,13 @@
                 <template v-if="modelValue > 0">
                     {{ kg }} kg × ${{ fmt(rate) }}/kg = <b>cost ${{ fmt(cost) }}</b>
                     <span v-if="margin > 0"> · +{{ fmt(margin, 0) }}% = <b>price ${{ fmt(price) }}</b></span>
+                    <span class="text-success"> ✓ filled in</span>
                 </template>
                 <span v-else class="text-muted">Type the weight to work out the cost</span>
             </div>
             <div class="small text-warning" v-else>Set the cost per kg first →</div>
         </div>
         <div class="d-flex flex-wrap gap-2 mt-2">
-            <button type="button" class="btn btn-sm btn-outline-primary" :disabled="!(cost > 0)" @click="$emit('apply', { cost, price: null, weight: modelValue })">Use as cost</button>
-            <button v-if="margin > 0" type="button" class="btn btn-sm btn-primary" :disabled="!(cost > 0)" @click="$emit('apply', { cost, price, weight: modelValue })">Use cost + suggested price</button>
             <button v-if="canEdit" type="button" class="btn btn-sm btn-link px-1" @click="editSettings">
                 {{ rate > 0 ? '$' + fmt(rate) + '/kg · ' + fmt(margin, 0) + '% margin - change' : 'Set cost per kg & margin' }}</button>
         </div>
@@ -48,7 +47,17 @@ export default {
         price() { return Math.round(this.cost * (1 + this.margin / 100) * 100) / 100; },
     },
     created() { this.load(); },
+    beforeUnmount() { clearTimeout(this._t); },
     methods: {
+        // Custom (Lebazone): typing the weight fills the purchase cost and the selling price straight away
+        onWeight(e) {
+            const g = +e.target.value || 0;
+            this.$emit('update:modelValue', g);
+            clearTimeout(this._t);
+            this._t = setTimeout(() => {
+                if (g > 0 && this.rate > 0) this.$emit('apply', { cost: this.cost, price: this.margin > 0 ? this.price : null, weight: g, auto: true });
+            }, 500);
+        },
         fmt(v, d = 2) { return Number(v || 0).toFixed(d); },
         load(force = false) {
             if (!cache || force) cache = axios.get(this.$apiUrl + '/scan/cost_settings').then(r => (r.data.status === 1 ? r.data.data : { cost_per_kg: 0, margin_percent: 0 }));

@@ -656,8 +656,6 @@ export default {
         applyWeightCost({ cost, price }) {
             this.form.cost = cost;
             if (price) this.form.price = price;
-            this.moreOpen = true; // the Cost field sits under "More details"
-            this.say(true, 'Cost $' + cost.toFixed(2) + (price ? ' and price $' + price.toFixed(2) : '') + ' filled in');
         },
         // Custom (Lebazone): link a new barcode to an existing product (e.g. added from the admin panel)
         openLink(code) {
