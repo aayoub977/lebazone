@@ -771,6 +771,13 @@ class HomeLayoutResolver
     private function resolveCategories(array $cfg, string $channel): array
     {
         $ids = array_map('intval', $cfg['category_ids'] ?? []);
+        // Custom (Lebazone): "all_categories" = every active top-level category, so a
+        // category added later shows up on the home page without editing the layout.
+        if (!empty($cfg['all_categories'])) {
+            $q = Category::where('status', 1)->where(fn ($w) => $w->whereNull('parent_id')->orWhere('parent_id', 0));
+            if (\Illuminate\Support\Facades\Schema::hasColumn('categories', 'sort_order')) $q->orderBy('sort_order');
+            $ids = $q->orderBy('id')->pluck('id')->map(fn ($v) => (int) $v)->all();
+        }
         if (empty($ids)) {
             return [];
         }

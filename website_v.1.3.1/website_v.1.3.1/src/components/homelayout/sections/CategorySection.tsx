@@ -30,6 +30,19 @@ import {
 //   grid        -> N-column grid (N from config.grid_columns; legacy "grid_<n>" also works)
 // config.category_gap / category_radius control spacing and corner radius
 // (legacy chip_gap / chip_radius still honored as fallback).
+// Custom (Lebazone): tile colours for categories that have no picture yet.
+const FALLBACK_COLORS = [
+  "linear-gradient(135deg,#DC2626,#7F1D1D)",
+  "linear-gradient(135deg,#7C3AED,#4C1D95)",
+  "linear-gradient(135deg,#0EA5E9,#075985)",
+  "linear-gradient(135deg,#EA580C,#9A3412)",
+  "linear-gradient(135deg,#059669,#065F46)",
+  "linear-gradient(135deg,#DB2777,#831843)",
+  "linear-gradient(135deg,#334155,#0F172A)",
+];
+const fallbackColor = (category: any) =>
+  FALLBACK_COLORS[Math.abs(Number(category?.id) || 0) % FALLBACK_COLORS.length];
+
 interface CategorySectionProps {
   block: any;
   borderRadius?: string | number;
@@ -56,10 +69,13 @@ const CategorySection = ({
   const isCircular = layout === "circular";
   const isRow = isHorizontal || isCircular;
   // Column count: prefer config.grid_columns, fall back to legacy "grid_<n>" layout suffix, then 4.
-  const cols =
+  const configuredCols =
     pickDeviceNumber(block?.config?.grid_columns, device, 0) ||
     Number.parseInt(layout.split("_")[1], 10) ||
     4;
+  // Custom (Lebazone): with only a few categories, don't leave half the grid empty —
+  // use one column per category (at least 3) so the tiles stay big and centred.
+  const cols = Math.min(configuredCols, Math.max(categories.length, 3));
 
   const gap = pickDeviceNumber(
     block?.config?.category_gap ?? block?.config?.chip_gap,
@@ -214,27 +230,43 @@ const CategorySection = ({
         className={`flex flex-col items-center text-center cursor-pointer group ${chipWidthClass}`}
       >
         <div
-          className="relative w-full max-w-[80px] sm:max-w-[96px] mx-auto aspect-square overflow-hidden bg-white dark:bg-zinc-900 border"
+          className={`relative w-full mx-auto aspect-square overflow-hidden bg-white dark:bg-zinc-900 border shadow-sm transition-shadow group-hover:shadow-md ${
+            isRow ? "max-w-[80px] sm:max-w-[96px]" : "max-w-[96px] sm:max-w-[140px]"
+          }`}
           style={{
             borderRadius: radius,
             borderColor:
               "color-mix(in srgb, var(--primary-color) 25%, transparent)",
           }}
         >
-          <ImageWithPlaceholder
-            src={category.image_url}
-            width={300}
-            height={300}
-            alt={category?.translations?.name ?? category?.name}
-            className="w-full h-full aspect-square object-contain p-1"
-          />
+          {category.image_url ? (
+            <ImageWithPlaceholder
+              src={category.image_url}
+              width={300}
+              height={300}
+              alt={category?.translations?.name ?? category?.name}
+              className="w-full h-full aspect-square object-contain p-1 transition-transform duration-300 group-hover:scale-110"
+            />
+          ) : (
+            // Custom (Lebazone): a category with no picture gets a coloured letter
+            // tile instead of the grey "no photo" placeholder.
+            <div
+              className="w-full h-full flex items-center justify-center text-white font-extrabold text-2xl sm:text-4xl transition-transform duration-300 group-hover:scale-110"
+              style={{ background: fallbackColor(category) }}
+            >
+              {String(category?.translations?.name ?? category?.name ?? "?")
+                .trim()
+                .charAt(0)
+                .toUpperCase()}
+            </div>
+          )}
         </div>
         {/* Chip captions use `item_text_color`, which is configured separately from
           the heading's `text_color` — the two sit on different backdrops (heading
           on the panel, captions under the chips), so one colour can't serve both.
           Unset → the default slate, which stays readable on a plain block. */}
         <span
-          className={`text-[11px] sm:text-xs leading-tight mt-2 w-full line-clamp-2 font-medium ${
+          className={`text-[11px] sm:text-sm leading-tight mt-2 w-full line-clamp-2 font-medium ${
             itemTextColor ? "" : "text-slate-700 dark:text-zinc-300"
           }`}
           style={itemTextColor ? { color: itemTextColor } : undefined}
@@ -359,8 +391,9 @@ const CategorySection = ({
           ) : (
             // grid: same N-column grid on mobile and desktop
             <div
-              className="grid"
+              className="grid mx-auto"
               style={{
+                maxWidth: categories.length < configuredCols ? cols * 180 : undefined,
                 gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
                 gap: `${gap}px`,
               }}
