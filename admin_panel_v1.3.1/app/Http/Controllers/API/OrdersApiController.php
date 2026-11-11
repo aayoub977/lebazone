@@ -469,11 +469,38 @@ class OrdersApiController extends Controller
         if (isset($request->id)) {
             $order = Order::find($request->id);
             if ($order) {
-                $order->delete();
+                // Custom (Lebazone): deleting an order gives its items back to the shop,
+                // exactly like cancelling does (it used to just vanish with the stock).
+                DB::transaction(function () use ($order) {
+                    foreach ($order->items()->get() as $item) {
+                        self::returnItemStock($item);
+                    }
+                    $order->delete();
+                });
                 return CommonHelper::responseSuccess('order_deleted_successfully');
             } else {
                 return CommonHelper::responseSuccess("Order Already Deleted!");
             }
+        }
+    }
+
+    /**
+     * Custom (Lebazone): put a deleted order item's quantity back on sale.
+     *  - payment pending  -> the stock was only reserved: release it
+     *  - cancelled / returned -> already given back when that happened: nothing
+     *  - delivered        -> it left the shop with the customer: nothing
+     *  - anything else (new, packing, on the way...) -> restock
+     */
+    private static function returnItemStock(OrderItem $item): void
+    {
+        $status = (int) $item->active_status;
+        $qty = (int) $item->quantity;
+        if ($qty <= 0 || !$item->product_variant_id) return;
+        if (in_array($status, [OrderStatusList::$cancelled, OrderStatusList::$returned, OrderStatusList::$delivered], true)) return;
+        if ($status === OrderStatusList::$paymentPending) {
+            ProductHelper::releaseStock($item->product_variant_id, $item->store_id, $qty);
+        } else {
+            ProductHelper::restockStock($item->product_variant_id, $item->store_id, $qty);
         }
     }
 
@@ -482,7 +509,10 @@ class OrdersApiController extends Controller
         if (isset($request->id)) {
             $orderItem = OrderItem::find($request->id);
             if ($orderItem) {
-                $orderItem->delete();
+                DB::transaction(function () use ($orderItem) {
+                    self::returnItemStock($orderItem);
+                    $orderItem->delete();
+                });
                 return CommonHelper::responseSuccess('order_item_deleted_successfully');
             } else {
                 return CommonHelper::responseSuccess("Order Item Already Deleted!");
