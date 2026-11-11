@@ -1389,6 +1389,7 @@ class ProductsApiController extends Controller
         return [
             'id'                 => (int) $p->id,
             'name'               => $listedVariants->isNotEmpty() ? (string) $listedVariants->first()->name : '',
+            'product_name'       => (string) ($p->name ?? ''), // Custom (Lebazone): the product's own name for the page title
             'slug'               => (string) $p->slug,
             'image_url'          => $p->image_url,
             'images'             => $images,

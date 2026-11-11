@@ -404,6 +404,7 @@ const ProductDetail = ({ initialProduct = null }: ProductDetailProps) => {
   // belong in the variant picker below, not in the heading.
   const displayName =
     product?.translations?.name ||
+    product?.product_name ||
     product?.name ||
     selectVariant?.translations?.name ||
     selectVariant?.name;
@@ -1038,7 +1039,7 @@ const ProductDetail = ({ initialProduct = null }: ProductDetailProps) => {
   return (
     <section>
       <BreadCrumb
-        title={product?.translations?.name ?? product?.name}
+        title={product?.translations?.name || product?.product_name || product?.name}
         categoryId={product?.category_id ?? product?.category?.id}
         categorySlug={product?.category_slug ?? product?.category?.slug}
       />
@@ -1218,6 +1219,42 @@ const ProductDetail = ({ initialProduct = null }: ProductDetailProps) => {
                       )}
                     </div>
                   )}
+
+                  {/* Custom (Lebazone): a product with ONE colour/size still shows it here,
+                      under the description (the picker below only appears for 2+). */}
+                  {product?.variants?.length === 1 && (() => {
+                    const v = selectVariant || product.variants[0];
+                    const attrs = (Array.isArray(v?.attributes) ? v.attributes : [])
+                      .filter((a) => a?.attribute_value);
+                    const vName = (v?.translations?.name || v?.name || "").trim();
+                    const pName = (product?.translations?.name || product?.product_name || "").trim();
+                    if (!attrs.length && (!vName || vName === pName)) return null;
+                    return (
+                      <div className="flex flex-wrap gap-2">
+                        {attrs.length ? (
+                          attrs.map((a, i) => (
+                            <span
+                              key={`${a.attribute_id ?? i}`}
+                              className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm"
+                            >
+                              {isColorAxis(a) && (
+                                <span
+                                  className="h-3.5 w-3.5 rounded-full border"
+                                  style={{ background: a?.swatch_value || a?.attribute_value }}
+                                />
+                              )}
+                              <span className="text-gray-500 dark:text-zinc-400">{a.attribute_name}:</span>
+                              <span className="font-semibold">{a.attribute_value}</span>
+                            </span>
+                          ))
+                        ) : (
+                          <span className="inline-flex items-center rounded-full border px-3 py-1 text-sm font-semibold">
+                            {vName}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })()}
 
                   {/* Variant selector — one row per axis (Color, Size, …) */}
                   {product?.variants?.length > 1 &&

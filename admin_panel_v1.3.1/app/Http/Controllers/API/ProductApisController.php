@@ -626,7 +626,10 @@ class ProductApisController extends Controller
                 $product->schema_markup = $translations[$defaultLangId]['schema_markup'] ?? $request->input('schema_markup') ?? '';
                 $product->tags = $translations[$defaultLangId]['tags'] ?? $request->input('tags') ?? '';
 
-                $product->slug = $this->makeProductSlug($defaultName, $product->id);
+                // Custom (Lebazone): the web address comes from the PRODUCT's name, not the first
+                // colour's ("white-medium"); falls back to the variant name when there is none.
+                $slugName = trim((string) ($product->name ?? '')) !== '' ? (string) $product->name : $defaultName;
+                $product->slug = $this->makeProductSlug($slugName, $product->id);
 
                 $product->save();
 

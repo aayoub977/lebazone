@@ -137,7 +137,9 @@ const ProductDetailModal = ({
     // of them silently fails to match and the full name renders.
     const bases = [
       productDetails?.translations?.name,
+      productDetails?.product_name,
       productDetails?.name,
+      product?.product_name,
       product?.translations?.name,
       product?.name,
     ]
@@ -744,8 +746,9 @@ const ProductDetailModal = ({
           // Heading is the product name, which is absent while loading — fall
           // back to a generic label so the dialog is never nameless.
           title={
-            productDetails?.translations?.name ??
-            productDetails?.name ??
+            productDetails?.translations?.name ||
+            productDetails?.product_name ||
+            productDetails?.name ||
             t("product")
           }
         >
@@ -765,7 +768,7 @@ const ProductDetailModal = ({
               <div className="flex flex-col justify-center md:justify-start mx-auto">
                 <div className="sticky top-0 z-20 bg-background px-4 pt-4 pb-4 md:px-6 md:pt-6 border-b-2 rounded-t-2xl md:rounded-t-2xl">
                   <h2 className="font-bold text-xl md:text-2xl break-words pe-10">
-                    {productDetails?.translations?.name ?? productDetails?.name}
+                    {productDetails?.translations?.name || productDetails?.product_name || productDetails?.name}
                   </h2>
                   <FewLeftBadge
                     variant={selectVariant}
