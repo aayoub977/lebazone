@@ -148,10 +148,14 @@ const NewUserModal = ({
         dispatch(setIsGuest({ data: false }));
         // }
         await handleFetchSetting();
+        // Custom (Lebazone): merge whenever there are guest items. The old check also
+        // needed user.status == 1 (often missing for a brand-new account) and read a
+        // stale `cart` snapshot, so a new shopper's cart was silently dropped.
         if (
-          cart?.isGuest === true &&
-          cart?.guestCart?.length !== 0 &&
-          result?.data?.user?.status == 1
+          (cart?.guestCartByChannel?.quick?.length || 0) +
+            (cart?.guestCartByChannel?.ecommerce?.length || 0) +
+            (cart?.guestCart?.length || 0) >
+          0
         ) {
           // addToBulkCart takes no params (reads `cart` from closure); the
           // access_token argument here was already ignored at runtime in the

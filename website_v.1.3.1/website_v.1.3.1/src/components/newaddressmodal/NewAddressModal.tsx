@@ -84,6 +84,9 @@ const NewAddressModal = ({
 }: NewAddressModalProps) => {
   const dispatch = useDispatch();
   const addresses = useSelector((state: any) => state.Addresses);
+  // Custom (Lebazone): the shopper's own details pre-fill a NEW address
+  const currentUser = useSelector((state: any) => state.User?.user);
+  const [editContact, setEditContact] = useState(false);
   const city = useSelector((state: any) => state.City.city);
   const language = useSelector((state: any) => state.Language.selectedLanguage);
   const dir = useDir();
@@ -348,9 +351,22 @@ const NewAddressModal = ({
         lat: parseFloat(city?.latitude ? city?.latitude : 0),
         lng: parseFloat(city?.longitude ? city?.longitude : 0),
       });
+      // Custom (Lebazone): fill the contact details from the shopper's last saved
+      // address, else their account (name / phone given at registration).
+      const saved = Array.isArray(addresses?.allAddresses) ? addresses.allAddresses : [];
+      const prev = saved.find((a: any) => Number(a?.is_default) === 1) || saved[0];
+      const userCode = currentUser?.country_code
+        ? (String(currentUser.country_code).startsWith("+") ? String(currentUser.country_code) : "+" + currentUser.country_code)
+        : undefined;
+      const preName = String(prev?.name || currentUser?.name || "").trim();
+      const preMobile = String(prev?.mobile || currentUser?.mobile || "").trim();
+      const preCode = prev?.mobile ? prev?.country_code : (currentUser?.mobile ? userCode : undefined);
+      // Name + number known -> show them as a small card with "Edit"; else show the fields.
+      setEditContact(!(preName && preMobile));
       setaddressDetails({
-        name: "",
-        mobile_num: "",
+        name: preName,
+        mobile_num: preMobile,
+        ...(preCode ? { country_code: preCode } : {}),
         alternate_mobile_num: "",
         address: "",
         landmark: "", 
@@ -985,6 +1001,25 @@ const NewAddressModal = ({
                       <Label className="block text-sm font-bold border-b border-gray-100 pb-1.5">
                         {t("contact_details")}
                       </Label>
+                      {/* Custom (Lebazone): known contact details as a card + Edit */}
+                      {!isAddressSelected && !editContact && addressDetails.name && addressDetails.mobile_num ? (
+                        <div className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2">
+                          <div className="min-w-0 text-sm">
+                            <div className="font-semibold truncate">{addressDetails.name}</div>
+                            <div className="text-gray-600 dark:text-zinc-300" dir="ltr">
+                              {addressDetails.country_code ? `${addressDetails.country_code} ` : ""}
+                              {addressDetails.mobile_num}
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            className="primaryColor text-sm font-semibold underline underline-offset-2 shrink-0"
+                            onClick={() => setEditContact(true)}
+                          >
+                            {t("edit") || "Edit"}
+                          </button>
+                        </div>
+                      ) : (
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         <div className="flex flex-col gap-1 sm:col-span-2">
                           <Label>
@@ -1030,6 +1065,7 @@ const NewAddressModal = ({
                           />
                         </div>
                       </div>
+                      )}
                     </div>
                     <div className="flex flex-col gap-1.5">
                       <Label className="block text-sm font-bold border-b border-gray-100 pb-1.5">

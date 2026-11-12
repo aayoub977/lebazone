@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import * as api from "@/api/apiRoutes";
+import { useSelector } from "react-redux";
 
 /**
  * Billing-details form state for the place-order flow (checkout page + quick
@@ -51,6 +52,27 @@ export default function useBillingDetails() {
   // free-text fallback: a country with no regions on file still needs a
   // region value typed in by hand rather than being stuck on an empty picker.
   const [regionsLoaded, setRegionsLoaded] = useState(false);
+
+  // Custom (Lebazone): pre-fill the Bill To name / number from the shopper's
+  // saved address or account, so a logged-in shopper isn't asked again.
+  const currentUser = useSelector((state: any) => state.User?.user);
+  const savedAddresses = useSelector((state: any) => state.Addresses?.allAddresses);
+  useEffect(() => {
+    const list = Array.isArray(savedAddresses) ? savedAddresses : [];
+    const prev = list.find((a: any) => Number(a?.is_default) === 1) || list[0];
+    const name = String(prev?.name || currentUser?.name || "").trim();
+    const mobile = String(prev?.mobile || currentUser?.mobile || "").trim();
+    const rawCode = prev?.mobile ? prev?.country_code : currentUser?.country_code;
+    const code = rawCode ? (String(rawCode).startsWith("+") ? String(rawCode) : "+" + rawCode) : "";
+    if (!name && !mobile) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time pre-fill of empty fields only
+    setBilling((b) => ({
+      ...b,
+      name: b.name || name,
+      mobile: b.mobile || mobile,
+      countryCode: b.countryCode || (mobile && !b.mobile ? code : b.countryCode),
+    }));
+  }, [currentUser?.name, currentUser?.mobile, savedAddresses]);
 
   // Fetch the country list once, for the Billing Country <select>.
   useEffect(() => {

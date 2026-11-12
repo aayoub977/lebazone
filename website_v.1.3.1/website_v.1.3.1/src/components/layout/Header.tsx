@@ -37,7 +37,7 @@ const CartDrawer = dynamic(() => import("../cart/CartDrawer"), { ssr: false });
 // Lazy, ssr:false: pulls in Firebase auth (Register/ForgetPasswordModal too), only needed after a click.
 const Login = dynamic(() => import("../login/Login"), { ssr: false });
 import { t } from "@/utils/translation";
-import { useDispatch, useSelector } from "react-redux";
+import { useDispatch, useSelector, useStore } from "react-redux";
 import { setShowLocation as setShowLocationAction } from "@/redux/slices/locationModalSlice";
 // Lottie ships ~250KB — load lazily, not in the main bundle.
 const Lottie = dynamic(() => import('lottie-react'), { ssr: false });
@@ -79,6 +79,7 @@ import {
   setCartSubTotal,
   setCartCurrency,
   setGuestChannel,
+  clearAllGuestCarts,
 } from "@/redux/slices/cartSlice";
 import SearchComponent from "../search/SearchComponent";
 import useHydratedMediaQuery from "@/hooks/useHydratedMediaQuery";
@@ -257,6 +258,7 @@ const Header = () => {
 
   // const themes = useSelector((state) => state.Theme);
   const cart = useSelector((state: any) => state.Cart);
+  const store = useStore(); // Custom (Lebazone): live state for the guest-cart merge
   const setting = useSelector((state: any) => state.Setting);
   // Scoped primitives for fetchCity's effect below — avoids re-running it on unrelated Setting object changes.
   const defaultCityLat = useSelector(
@@ -341,11 +343,47 @@ const Header = () => {
   // slow earlier one can't overwrite a newer result.
   const cartFetchKeyRef = useRef<string | null>(null);
   const cartFetchSeqRef = useRef(0);
+  // Custom (Lebazone): safety net for "items vanish from the cart after registering".
+  // Every login/sign-up screen merges the guest cart itself; if any path skipped it
+  // (e.g. a new Google account), the items are still in the guest cart a few seconds
+  // after the shopper is logged in - merge them here so nothing is lost.
+  const guestMergeTimerRef = useRef<any>(null);
+  const scheduleGuestMergeSafetyNet = () => {
+    if (guestMergeTimerRef.current) return;
+    guestMergeTimerRef.current = setTimeout(async () => {
+      guestMergeTimerRef.current = null;
+      const st: any = (store as any).getState();
+      if (!st?.User?.jwtToken) return;
+      const quick = st?.Cart?.guestCartByChannel?.quick || [];
+      const ecommerce = st?.Cart?.guestCartByChannel?.ecommerce || [];
+      if (!quick.length && !ecommerce.length) return;
+      try {
+        const res = await api.addToBulkCart({
+          quick_variant_ids: quick.length ? quick.map((p: any) => p.product_variant_id).join(",") : undefined,
+          quick_quantities: quick.length ? quick.map((p: any) => p.qty).join(",") : undefined,
+          ecommerce_variant_ids: ecommerce.length ? ecommerce.map((p: any) => p.product_variant_id).join(",") : undefined,
+          ecommerce_quantities: ecommerce.length ? ecommerce.map((p: any) => p.qty).join(",") : undefined,
+          latitude: st?.City?.city?.latitude,
+          longitude: st?.City?.city?.longitude,
+        });
+        if (res?.status == 1) dispatch(clearAllGuestCarts()); // -> the cart refetches with the merged items
+      } catch (e) {
+        console.log("guest cart merge failed", e);
+      }
+    }, 6000);
+  };
+
   const fetchCartForMode = async () => {
     if (!user?.jwtToken) return;
     // Snapshot which channel this request is for, so a late response doesn't write the wrong bucket.
     const channel = shopMode === "quick" ? "quick" : "ecommerce";
-    const fetchKey = `${channel}|${cityLat}|${cityLng}`;
+    // Custom (Lebazone): the guest-cart size is part of the key, so the cart is fetched
+    // AGAIN once a just-logged-in shopper's guest items have been merged into the account
+    // (before, the first - still empty - fetch blocked that and the cart looked empty).
+    const guestLen =
+      (cart?.guestCartByChannel?.quick?.length || 0) +
+      (cart?.guestCartByChannel?.ecommerce?.length || 0);
+    const fetchKey = `${channel}|${cityLat}|${cityLng}|${guestLen}`;
     if (cartFetchKeyRef.current === fetchKey) return;
     cartFetchKeyRef.current = fetchKey;
     const mySeq = ++cartFetchSeqRef.current;
@@ -446,6 +484,7 @@ const Header = () => {
       // getCart needs latitude server-side — wait for coords or it 0-returns "latitude required".
       if (cityLat == null) return;
       fetchCartForMode();
+      scheduleGuestMergeSafetyNet();
     } else {
       fetchGuestCartCurrency();
     }
