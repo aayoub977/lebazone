@@ -16,14 +16,17 @@ set "MYSQL="
 for /d %%D in (C:\laragon\bin\mysql\*) do if exist "%%D\bin\mysql.exe" set "MYSQL=%%D\bin\mysql.exe"
 
 :waitdb
+rem Custom (Lebazone): the admin part also makes sure MySQL + Apache are running (keep-alive.bat)
+if /i "%1"=="admin" call "%SRV%keep-alive.bat"
 "%MYSQL%" -u root -h 127.0.0.1 -e "SELECT 1" >nul 2>&1 && goto :loop
 timeout /t 5 /nobreak >nul
 goto :waitdb
 
 :loop
+rem ...and checks every minute that MySQL + Apache are still up (starts them if not)
+if /i "%1"=="admin" if exist "C:\laragon\etc\apache2\sites-enabled\lebazone-admin.conf" ( call "%SRV%keep-alive.bat" & timeout /t 60 /nobreak >nul & goto :loop )
 echo %date% %time% start %1 >> "%LOGS%\services.log"
 rem once speed-up.bat has moved the admin to Laragon's Apache, this part just waits
-if /i "%1"=="admin" if exist "C:\laragon\etc\apache2\sites-enabled\lebazone-admin.conf" ( timeout /t 3600 /nobreak >nul & goto :loop )
 if /i "%1"=="admin" (
   cd /d "%ADMIN%"
   "%PHP%" artisan serve --host=127.0.0.1 --port=8100 >nul 2>&1
