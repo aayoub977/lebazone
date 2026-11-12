@@ -4,6 +4,8 @@ rem   1. Saved on this PC in C:\lebazone-backups
 rem   2. Copied to Google Drive (folder "lebazone-backups" in My Drive) when Google Drive
 rem      for desktop is installed and signed in - so a copy survives if this PC dies.
 rem   3. Also OneDrive\lebazone-backups if OneDrive is set up on this PC.
+rem   4. Secret files (.env, login keys, tunnel) as a PASSWORD-PROTECTED zip in Google Drive
+rem      "My Drive\lebazone-keys" (secrets-backup.ps1, needs 7-Zip).
 setlocal EnableDelayedExpansion
 set "SRV=%~dp0"
 for %%I in ("%SRV%..\..") do set "ROOT=%%~fI"
@@ -54,4 +56,6 @@ rem ---- keep 14 days everywhere ----
 for %%T in ("%DEST%" "!GDRIVE!" "!ONED!") do if not "%%~T"=="" powershell -NoProfile -Command "Get-ChildItem '%%~T' -Filter 'lebazone-*' -ErrorAction SilentlyContinue | Where-Object { $_.LastWriteTime -lt (Get-Date).AddDays(-14) } | Remove-Item -Force"
 
 if not defined GDRIVE echo %date% %time% note: Google Drive for desktop not found - backup kept on this PC only >> "%LOGS%\backup.log"
+rem ---- secret files (.env, login keys, tunnel) -> encrypted zip on Google Drive (secrets-backup.ps1) ----
+powershell -NoProfile -ExecutionPolicy Bypass -File "%SRV%secrets-backup.ps1" "!GDRIVE!" "%LOGS%\backup.log"
 echo %date% %time% backup done ^(!SZ! bytes^) to !WHERE! >> "%LOGS%\backup.log"

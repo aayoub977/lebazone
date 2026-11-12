@@ -17,7 +17,7 @@ if (DB::table('settings')->where('variable', 'lebazone_policies_v1')->value('val
 
 $contact = <<<'H'
 <h3>Contact us</h3>
-<p>Email: <a href="mailto:lb.lebazone@gmail.com">lb.lebazone@gmail.com</a><br>WhatsApp: <a href="https://wa.me/96181976696">+961 81 976 696</a><br>Website: lebazone.store</p>
+<p>Email: <a href="mailto:lb.lebazone@gmail.com">lb.lebazone@gmail.com</a><br>Website: lebazone.store</p>
 H;
 $updated = '<p><i>Last updated: 12 November 2026</i></p>';
 
@@ -88,7 +88,7 @@ $p['return_policy'] = $updated . <<<'H'
 </ul>
 <h3>How to return</h3>
 <ol>
-<li>Open <b>My Orders</b>, choose the item and tap <b>Return</b> - or contact us on WhatsApp.</li>
+<li>Open <b>My Orders</b>, choose the item and tap <b>Return</b> - or email us.</li>
 <li>We confirm the return and arrange a pickup, or you can drop it off.</li>
 <li>We inspect the item when it reaches us (usually within 2 working days).</li>
 </ol>
