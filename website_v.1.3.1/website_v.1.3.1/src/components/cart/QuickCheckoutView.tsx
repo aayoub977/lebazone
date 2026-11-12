@@ -945,16 +945,6 @@ const QuickCheckoutView = ({
                     </div>
                     <div className="grid grid-cols-2 gap-3.5">
                       <div className="flex flex-col gap-1.5">
-                        <Label className="text-sm font-semibold textColor">{t("enter_pincode")}</Label>
-                        <Input
-                          type="text"
-                          className="h-auto py-2.5 bg-[#f4f5f7] dark:bg-zinc-800 border-transparent"
-                          placeholder={t("enter_pincode")}
-                          value={billingDetails.billing.pincode}
-                          onChange={(e) => billingDetails.setField("pincode", e.target.value)}
-                        />
-                      </div>
-                      <div className="flex flex-col gap-1.5">
                         <Label className="text-sm font-semibold textColor">{t("enter_country")}</Label>
                         <Select
                           value={billingDetails.billing.countryId || undefined}
@@ -1101,16 +1091,6 @@ const QuickCheckoutView = ({
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-3.5">
-                  <div className="flex flex-col gap-1.5">
-                    <Label className="text-sm font-semibold textColor">{t("enter_pincode")}</Label>
-                    <Input
-                      type="text"
-                      className="h-auto py-2.5 bg-[#f4f5f7] dark:bg-zinc-800 border-transparent"
-                      placeholder={t("enter_pincode")}
-                      value={billingDetails.billing.pincode}
-                      onChange={(e) => billingDetails.setField("pincode", e.target.value)}
-                    />
-                  </div>
                   <div className="flex flex-col gap-1.5">
                     <Label className="text-sm font-semibold textColor">{t("enter_country")}</Label>
                     <Select

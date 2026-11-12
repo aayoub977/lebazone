@@ -1130,22 +1130,6 @@ const NewAddressModal = ({
                           />
                         </div>
                         <div className="flex flex-col gap-1">
-                          <Label>{t("enter_pincode")}</Label>
-                          <Input
-                            type="text"
-                            className="h-9"
-                            placeholder={t("enter_pincode")}
-                            value={addressDetails.pincode}
-                            onChange={(e) =>
-                              setaddressDetails((state) => ({
-                                ...state,
-                                pincode: e.target.value,
-                              }))
-                            }
-                            required
-                          />
-                        </div>
-                        <div className="flex flex-col gap-1">
                           <Label>
                             {t("enter_city")}
                             <span className="text-red-500">*</span>

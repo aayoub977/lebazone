@@ -3166,7 +3166,7 @@ class CommonHelper
         }
         // Name + mobiles are stored separately in the address object, so the formatted
         // string holds only the location parts.
-        return $a->address . ' ' . $a->landmark . ' ' . $a->area . ' ' . $a->city . ' ' . $a->state . ' ' . $a->country . '-' . $a->pincode;
+        return $a->address . ' ' . $a->landmark . ' ' . $a->area . ' ' . $a->city . ' ' . $a->state . ' ' . $a->country . (trim((string) $a->pincode) !== '' ? '-' . $a->pincode : '');
     }
 
     /**

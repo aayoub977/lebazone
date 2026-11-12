@@ -189,7 +189,7 @@ class OrderApiController extends Controller
                     'billing_address' => 'required|string|max:500',
                     'billing_city'    => 'required|string|max:191',
                     'billing_state'   => 'required|string|max:191',
-                    'billing_pincode' => 'required|string|max:32',
+                    'billing_pincode' => 'nullable|string|max:32', // Custom (Lebazone): no post codes
                     'billing_country' => 'required|string|max:191',
                     'billing_region_id' => 'nullable|exists:regions,id',
                 ]);

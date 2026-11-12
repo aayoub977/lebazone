@@ -82,6 +82,7 @@ class AddressApiController extends Controller
 
     public function save(Request $request){
         $input = $request->all();
+        $input['pincode'] = (string) ($input['pincode'] ?? ''); // Custom (Lebazone): optional, column is NOT NULL
         $validator = Validator::make($request->all(),[
             'name' => 'required',
             'mobile' => 'required',
@@ -93,7 +94,7 @@ class AddressApiController extends Controller
             'area' => 'required',
             'latitude' => 'required',
             'longitude' => 'required',
-            'pincode' => 'required',
+            'pincode' => 'nullable', // Custom (Lebazone): no post codes in Lebanon
             'city' => 'required',
             'state' => 'required',
             'country' => 'required',
@@ -133,6 +134,7 @@ class AddressApiController extends Controller
     public function update(Request $request){
 
         $input = $request->all();
+        $input['pincode'] = (string) ($input['pincode'] ?? ''); // Custom (Lebazone): optional, column is NOT NULL
         $validator = Validator::make($request->all(),[
             'id' => 'required',
             'name' => 'required',
@@ -143,7 +145,7 @@ class AddressApiController extends Controller
             'address' => 'required',
             'landmark' => 'required',
             'area' => 'required',
-            'pincode' => 'required',
+            'pincode' => 'nullable', // Custom (Lebazone): no post codes in Lebanon
             'city' => 'required',
             'state' => 'required',
             'country' => 'required',
