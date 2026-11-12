@@ -30,16 +30,17 @@ Route::get('/maps_geocoding', [GeneralSettingsApiController::class, 'mapsGeocodi
 
 Route::group(['middleware' => ['auth.customer']], function () {
 
-    Route::post('send_sms', [CustomerAuthController::class, 'sendSms']);
-    Route::post('verify_user', [CustomerAuthController::class, 'verifyContact']);
-    Route::post('register', [CustomerAuthController::class, 'register']);
-    Route::post('verify_email', [CustomerAuthController::class, 'verifyEmail']);
+    // Custom (Lebazone): login / code / reset routes are rate-limited (lbz-auth)
+    Route::post('send_sms', [CustomerAuthController::class, 'sendSms'])->middleware('throttle:lbz-auth');
+    Route::post('verify_user', [CustomerAuthController::class, 'verifyContact'])->middleware('throttle:lbz-auth');
+    Route::post('register', [CustomerAuthController::class, 'register'])->middleware('throttle:lbz-auth');
+    Route::post('verify_email', [CustomerAuthController::class, 'verifyEmail'])->middleware('throttle:lbz-auth');
     Route::post('verify_user_exist', [CustomerAuthController::class, 'verifyUserExist']);
-    Route::post('login', [CustomerAuthController::class, 'login']);
+    Route::post('login', [CustomerAuthController::class, 'login'])->middleware('throttle:lbz-auth');
     Route::get('login', [CustomerAuthController::class, 'notLogin'])->name('login');
     Route::post('add_fcm_token', [CustomerAuthController::class, 'addFcmToken']);
-    Route::post('send_email_forgot_password_otp', [CustomerAuthController::class, 'forgetPasswordOtp']);
-    Route::post('forgot_password', [CustomerAuthController::class, 'forgotPassword']);
+    Route::post('send_email_forgot_password_otp', [CustomerAuthController::class, 'forgetPasswordOtp'])->middleware('throttle:lbz-auth');
+    Route::post('forgot_password', [CustomerAuthController::class, 'forgotPassword'])->middleware('throttle:lbz-auth');
 
     // Guest
     Route::get('categories', [BasicApiController::class, 'getCategories']);

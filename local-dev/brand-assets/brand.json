@@ -34,7 +34,7 @@
     "lng": 35.4823,
     "phone": "+96170000001",
     "email": "store@lebazone.local",
-    "password": "Lebazone@2026"
+    "password": ""
   },
   "delivery": {
     "flat": 3,
@@ -45,7 +45,7 @@
   "test_customer": {
     "cc": "+961",
     "mobile": "70000000",
-    "password": "Lebazone@1234"
+    "password": ""
   },
   "home_bg": "#FEF2F2"
 }

@@ -182,6 +182,7 @@ if (Schema::hasTable('delivery_boys')) {
 
 // ---------- 5. Store ----------
 $s = $b['store'];
+$s['password'] = ($s['password'] ?? '') !== '' ? $s['password'] : 'Lbz-' . bin2hex(random_bytes(6)); // Custom (Lebazone): no password stored in brand.json
 $store = Store::where('zone_id', $zone->id)->first();
 if (!$store) {
     $r = call_api(StoreApiController::class, 'save', [
@@ -312,6 +313,7 @@ echo "  - home page colours and sections updated\n";
 
 // ---------- 8. Test customer ----------
 $t = $b['test_customer'];
+$t['password'] = ($t['password'] ?? '') !== '' ? $t['password'] : 'Lbz-' . bin2hex(random_bytes(6));
 $user = User::withTrashed()->where('mobile', $t['mobile'])->where('country_code', $t['cc'])->first() ?? new User();
 if (method_exists($user, 'trashed') && $user->trashed()) {
     $user->restore();

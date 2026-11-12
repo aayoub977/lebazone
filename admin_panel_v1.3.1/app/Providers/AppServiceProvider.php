@@ -58,6 +58,19 @@ class AppServiceProvider extends ServiceProvider
     {
         Builder::defaultStringLength(191);
 
+        // Custom (Lebazone): limits for logins / codes / password resets. Counted per
+        // account AND per visitor, so one attacker can't hammer one account, and a
+        // shared address (everyone behind the same mobile network) isn't locked out.
+        \Illuminate\Support\Facades\RateLimiter::for('lbz-auth', function (\Illuminate\Http\Request $r) {
+            $who = strtolower(trim((string) ($r->input('email') ?: $r->input('id') ?: $r->input('mobile') ?: $r->input('phone') ?: '')));
+            $ip = (string) ($r->header('CF-Connecting-IP') ?: $r->ip());
+            return [
+                \Illuminate\Cache\RateLimiting\Limit::perMinute(10)->by('acct|' . $who),
+                \Illuminate\Cache\RateLimiting\Limit::perMinute(30)->by('ip|' . $ip),
+                \Illuminate\Cache\RateLimiting\Limit::perHour(40)->by('acct-h|' . $who),
+            ];
+        });
+
         // Custom: behind an HTTPS tunnel/proxy, build every link and image URL as https.
         // ...but not when the admin is opened directly on this PC (http://127.0.0.1:8100).
         $host = request()->getHost();

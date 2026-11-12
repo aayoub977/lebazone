@@ -87,12 +87,12 @@ Route::group(['prefix' => 'install'], function () {
     Route::post('purchase_code', [InstallController::class, 'checkPurchaseCode']);
 });
 
-Route::post('login', [AdminAuthController::class, 'login']);
+Route::post('login', [AdminAuthController::class, 'login'])->middleware('throttle:lbz-auth'); // Custom (Lebazone)
 // Custom (Lebazone): Face ID / fingerprint sign-in (passkeys)
 Route::get('passkey/login_options', [\App\Http\Controllers\API\PasskeyController::class, 'loginOptions'])->middleware('throttle:30,1');
 Route::post('passkey/login', [\App\Http\Controllers\API\PasskeyController::class, 'login'])->middleware('throttle:20,1');
-Route::post('forgot_password', [AdminAuthController::class, 'forgetPassword'])->name('forget-password');
-Route::post('reset-password', [AdminAuthController::class, 'resetPassword'])->name('reset-password');
+Route::post('forgot_password', [AdminAuthController::class, 'forgetPassword'])->name('forget-password')->middleware('throttle:lbz-auth');
+Route::post('reset-password', [AdminAuthController::class, 'resetPassword'])->name('reset-password')->middleware('throttle:lbz-auth');
 Route::get('system_languages', [LanguageApiController::class, 'getSystemLanguages']);
 Route::get('active_languages', [LanguageApiController::class, 'getActiveLanguages']);
 Route::get('password_policy', [GeneralSettingsApiController::class, 'getPasswordPolicy']);

@@ -75,6 +75,11 @@ class InstallController
     }
 
     public function setDatabase(Request $request){
+        // Custom (Lebazone): SECURITY - the installer can rewrite the database settings and
+        // create an admin. It is closed for good once the shop is installed.
+        if (file_exists(storage_path('installed'))) {
+            return CommonHelper::responseError('Already installed');
+        }
 
         $validator = Validator::make($request->all(),[
             'database_host'     => 'required',
@@ -194,6 +199,11 @@ class InstallController
     }
 
     public function checkPurchaseCode(Request $request){
+        // Custom (Lebazone): SECURITY - the installer can rewrite the database settings and
+        // create an admin. It is closed for good once the shop is installed.
+        if (file_exists(storage_path('installed'))) {
+            return CommonHelper::responseError('Already installed');
+        }
 
         $validator = Validator::make($request->all(),[
             'purchase_code'     => 'required',

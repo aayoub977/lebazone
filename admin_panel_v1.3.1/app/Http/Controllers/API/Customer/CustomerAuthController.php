@@ -164,6 +164,7 @@ class CustomerAuthController extends Controller
             if ($user) {
                 $verificationCode = rand(100000, 999999);
                 $user->email_verification_code = $verificationCode;
+                if (!empty($user->id)) { self::codeClear('verify|' . $user->id); self::codeClear('reset|' . $user->id); } // Custom (Lebazone): new code = fresh tries
                 $user->is_verified = false; // Initially not verified
 
                 try {
@@ -377,6 +378,7 @@ class CustomerAuthController extends Controller
 
                     $verificationCode = rand(100000, 999999);
                     $pending->email_verification_code = $verificationCode;
+                    if (!empty($pending->id)) { self::codeClear('verify|' . $pending->id); self::codeClear('reset|' . $pending->id); } // Custom (Lebazone): new code = fresh tries
                     $pending->is_verified = false;
 
                     try {
@@ -481,6 +483,7 @@ class CustomerAuthController extends Controller
                 if ($request->type == 'email') {
                     $verificationCode = rand(100000, 999999);
                     $user->email_verification_code = $verificationCode;
+                    if (!empty($user->id)) { self::codeClear('verify|' . $user->id); self::codeClear('reset|' . $user->id); } // Custom (Lebazone): new code = fresh tries
                     $user->is_verified = false;
                     $user->save();
 
@@ -806,9 +809,15 @@ class CustomerAuthController extends Controller
 
         $user = User::where('email', $request->email)->first();
 
-        if (!$user || $user->email_verification_code != $request->code) {
+        // Custom (Lebazone): at most 5 wrong tries per code, then a new code is needed
+        if ($user && self::codeLocked('verify|' . $user->id)) {
+            return CommonHelper::responseError(__('Too many wrong codes. Please request a new code.'));
+        }
+        if (!$user || empty($user->email_verification_code) || (string) $user->email_verification_code !== (string) $request->code) {
+            if ($user) self::codeFailed('verify|' . $user->id, $user);
             return CommonHelper::responseError(__('Invalid verification code'));
         }
+        self::codeClear('verify|' . $user->id);
 
         // Mark the user as verified
         $user->is_verified = true;
@@ -841,6 +850,7 @@ class CustomerAuthController extends Controller
             $verificationCode = random_int(100000, 999999);
 
             $user->email_verification_code = $verificationCode;
+            if (!empty($user->id)) { self::codeClear('verify|' . $user->id); self::codeClear('reset|' . $user->id); } // Custom (Lebazone): new code = fresh tries
 
             // Send forgot password code to email
             try {
@@ -884,14 +894,21 @@ class CustomerAuthController extends Controller
         }
 
         if ($request->type === 'email') {
-            // Check OTP in users table for email
-            $user = User::where('email', $request->email)
-                ->where('email_verification_code', $request->otp)
-                ->first();
+            // Custom (Lebazone): the code is REQUIRED (an empty code used to match every
+            // verified account, whose saved code is empty) + at most 5 wrong tries.
+            $candidate = User::where('email', $request->email)->first();
+            $otpIn = trim((string) $request->otp);
+            if ($candidate && self::codeLocked('reset|' . $candidate->id)) {
+                return CommonHelper::responseError('Too many wrong codes. Please request a new code.');
+            }
+            $user = ($candidate && $otpIn !== '' && !empty($candidate->email_verification_code)
+                && (string) $candidate->email_verification_code === $otpIn) ? $candidate : null;
 
             if (!$user) {
+                if ($candidate) self::codeFailed('reset|' . $candidate->id, $candidate);
                 return CommonHelper::responseError('Invalid or expired OTP');
             }
+            self::codeClear('reset|' . $user->id);
         } elseif ($request->type === 'phone') {
             $forgotCc = $this->normalizeCountryCode($request->input('country_code'));
             $otpPhoneKey = $forgotCc . $request->mobile;
@@ -960,6 +977,29 @@ class CustomerAuthController extends Controller
         }
 
         return response()->json(['status' => 1, 'message' => 'user_already_exist']);
+    }
+
+    // Custom (Lebazone): wrong-code counter. 5 wrong tries -> the code is wiped, so the
+    // shopper must ask for a new one (stops guessing a 6-digit code by script).
+    private static function codeLocked(string $key): bool
+    {
+        return (int) \Illuminate\Support\Facades\Cache::get('lbz_code_fail|' . $key, 0) >= 5;
+    }
+
+    private static function codeFailed(string $key, $user = null): void
+    {
+        $k = 'lbz_code_fail|' . $key;
+        $n = (int) \Illuminate\Support\Facades\Cache::get($k, 0) + 1;
+        \Illuminate\Support\Facades\Cache::put($k, $n, now()->addMinutes(30));
+        if ($n >= 5 && $user) {
+            $user->email_verification_code = null;
+            $user->save();
+        }
+    }
+
+    private static function codeClear(string $key): void
+    {
+        \Illuminate\Support\Facades\Cache::forget('lbz_code_fail|' . $key);
     }
 
     /** Custom (Hader): codes go to a log file instead of WhatsApp/SMS (local testing only). */
