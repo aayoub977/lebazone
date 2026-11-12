@@ -393,6 +393,17 @@ class ProductsApiController extends Controller
                 break;
         }
 
+        // Custom (Lebazone): a "Sort by" the shopper picked always wins. The website
+        // remembers the last "See all" row (data_source, e.g. New arrivals) and kept
+        // sending it, and that row's own order silently replaced the chosen sort -
+        // which is why sorting worked in a fresh browser but not on phones/Chrome
+        // that had tapped "See all" once. The row's filter (e.g. only discounted
+        // items) still applies; only the ORDER is replaced.
+        if ($orderApplied && !$isSimilar && in_array($sort, ['price_low', 'price_high', 'discount', 'popular'], true)) {
+            $query->reorder();
+            $orderApplied = false;
+        }
+
         if (!$orderApplied) {
             // Price is per-store (PVSS): sort by the effective price in the zone's stores.
             $pvssJoin = "FROM product_variant_store_stocks pvss
