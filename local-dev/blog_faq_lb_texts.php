@@ -4,14 +4,14 @@
 return [
 'categories' => [
     'guides'        => 'Guides',
-    'tech-tips'     => 'Tech Tips',
     'kitchen'       => 'Kitchen',
     'home-living'   => 'Home & Living',
-    'seasonal'      => 'Seasonal',
+    'personal-care' => 'Personal Care',
 ],
 'blogs' => [
 [
  'slug' => 'how-ordering-on-lebazone-works', 'cat' => 'guides', 'image' => 'lebazone-blog-howto.jpg',
+ 'products' => ['Air Fryer', 'Vacum Cleaner', 'LED Desk Lamp'],
  'title' => 'How ordering on Lebazone works: delivery, payment and returns',
  'short' => 'Everything you need to know before your first order - from checkout to your door, and what to do if something is not right.',
  'body' => <<<'H'
@@ -34,59 +34,63 @@ return [
 <p>Full details are in our Shipping, Return and Cancellation policies at the bottom of every page. Happy shopping!</p>
 H],
 [
- 'slug' => 'choosing-the-right-phone-charger-and-cable', 'cat' => 'tech-tips', 'image' => 'lebazone-blog-charger.jpg',
- 'title' => 'Choosing the right phone charger and cable',
- 'short' => 'Slow charging, a hot phone or a cable that dies in a month? A few simple checks help you pick a charger that is fast and safe.',
+ 'slug' => 'choosing-the-right-heater-for-winter', 'cat' => 'home-living', 'image' => 'lebazone-blog-heaters.jpg',
+ 'products' => ['Convector Heater', 'Fan Heater', 'Electric Brazier Heater'],
+ 'title' => 'Winter is coming: how to choose the right electric heater',
+ 'short' => 'Convector, fan heater or electric brazier? A quick guide to warming each room safely - and without wasting electricity.',
  'body' => <<<'H'
-<p>Not all chargers are equal. The wrong one charges slowly at best - and at worst it heats your phone and wears out the battery. Here is what to look at.</p>
-<h2>1. Match the connector</h2>
-<p>Most new Android phones and the latest iPhones use <b>USB-C</b>. Older iPhones use <b>Lightning</b>, and many older Android phones use <b>Micro-USB</b>. Check your phone before you buy - and if your charger has a USB-C port, you will need a USB-C to USB-C (or USB-C to Lightning) cable.</p>
-<h2>2. Look at the watts (W)</h2>
+<p>Cold evenings are back. Picking the right heater for the right room keeps you warm and keeps your electricity (and generator) bill under control.</p>
+<h2>Fan heater - fast heat for small rooms</h2>
+<p>A fan heater blows warm air and heats a small room in minutes. It is perfect for a bathroom before a shower, a small bedroom or a home office. It is light and easy to carry from room to room.</p>
+<h2>Convector heater - quiet, even warmth</h2>
+<p>A convector warms the air slowly and spreads the heat evenly, with no fan noise. It is ideal for bedrooms and living rooms where you want steady warmth for hours, and many have a thermostat that keeps the temperature you choose.</p>
+<h2>Electric brazier - the cosy, traditional feel</h2>
+<p>An electric brazier gives the warm glow of a traditional kanoun without charcoal, smoke or fumes. It is great for sitting areas where the family gathers.</p>
+<h2>How much power do you need?</h2>
 <ul>
-<li><b>5-10W:</b> basic charging - fine overnight, slow during the day.</li>
-<li><b>18-25W:</b> fast charging for most phones.</li>
-<li><b>30W and more:</b> very fast charging for phones that support it, and enough for many tablets.</li>
+<li>Small room or bathroom: around 1000-1500 W.</li>
+<li>Medium bedroom or office: 1500-2000 W.</li>
+<li>Living room: 2000 W or more, or two heaters in different spots.</li>
 </ul>
-<p>Your phone only takes the power it supports, so a bigger charger is safe - it just will not charge faster than your phone allows.</p>
-<h2>3. Fast-charging standards</h2>
-<p>For fast charging, the charger and phone must speak the same language. Look for <b>USB Power Delivery (PD)</b> - used by iPhones and most modern phones - or <b>Quick Charge (QC)</b> on many Android phones.</p>
-<h2>4. The cable matters too</h2>
-<p>A thin, cheap cable can slow everything down. Choose a cable rated for the power you want (for example "60W"), with strong ends and a braided or thick cover if you use it every day.</p>
-<h2>5. Safety signs</h2>
+<p>On a generator subscription, check how many amps you have: a 2000 W heater uses roughly 9 amps on its own.</p>
+<h2>Safety first</h2>
 <ul>
-<li>Stop using any charger that gets very hot, smells of burning or makes noise.</li>
-<li>Do not charge on beds or sofas - heat needs to escape.</li>
-<li>Replace frayed or bent cables right away.</li>
+<li>Keep heaters at least one metre from curtains, beds and sofas.</li>
+<li>Plug them straight into the wall, not into an extension lead.</li>
+<li>Choose models with overheat protection and a tip-over switch.</li>
+<li>Switch off when you leave the room or go to sleep.</li>
 </ul>
-<p>Browse our Electronics &amp; Accessories section for chargers and cables, and check each product page for the connector type and power.</p>
+<p>See convector heaters, fan heaters and electric braziers in our Home &amp; Living section.</p>
 H],
 [
  'slug' => 'kitchen-appliances-that-save-you-time', 'cat' => 'kitchen', 'image' => 'lebazone-blog-kitchen.jpg',
+ 'products' => ['Air Fryer', '3 In 1 Kitchen Machine', 'Jug Blender'],
  'title' => '5 kitchen appliances that save you time every day',
- 'short' => 'Less chopping, less waiting, less washing up. These everyday helpers give you back time in the kitchen.',
+ 'short' => 'Less oil, less chopping, less waiting. These everyday helpers give you back time in the kitchen.',
  'body' => <<<'H'
-<p>Cooking at home is cheaper and healthier - but it takes time. The right small appliances do the boring parts for you.</p>
-<h2>1. A blender</h2>
-<p>Smoothies, soups, sauces, hummus and baby food in a minute. Pick one with a strong motor and a jar that is easy to clean - many can go in the dishwasher.</p>
-<h2>2. A multi-function kitchen machine</h2>
-<p>One machine that mixes, kneads and whips saves you buying three. Great for dough, cakes and whipped cream, and it keeps your hands free while it works.</p>
-<h2>3. A hand mixer</h2>
-<p>Small, light and easy to store - perfect for quick batters, eggs and cream when you do not need the big machine.</p>
-<h2>4. A food chopper</h2>
-<p>Onions, garlic, parsley and nuts chopped in seconds, with no tears. Ideal for tabbouleh season.</p>
-<h2>5. Smart storage</h2>
-<p>It is not an appliance, but a good shelf, rack or organiser means you find everything quickly and keep your counter clear - which is half the time saved.</p>
+<p>Cooking at home is cheaper and healthier - but it takes time. The right appliances do the slow parts for you.</p>
+<h2>1. Air fryer</h2>
+<p>Crispy fries, chicken wings and vegetables with little or no oil. It heats up in a few minutes, so it is often faster than the oven - and the basket is easy to clean.</p>
+<h2>2. 3-in-1 kitchen machine</h2>
+<p>One machine that kneads dough, mixes cakes and whips cream. Start the dough, walk away, and come back when it is ready.</p>
+<h2>3. Blender</h2>
+<p>Smoothies, soups, sauces and hummus in a minute. A jug blender is best for bigger amounts; a hand blender is great for soups straight in the pot.</p>
+<h2>4. Electric juicer</h2>
+<p>Fresh orange or lemon juice every morning without squeezing by hand - quick, and much less mess.</p>
+<h2>5. Vacuum sealer</h2>
+<p>Seal meat, cheese and leftovers so they last longer in the fridge and freezer. Cook once, store in portions, and save time all week.</p>
 <h2>Tips before you buy</h2>
 <ul>
-<li>Check the power (watts): more power usually means faster, smoother results.</li>
-<li>Check the size against your counter and cupboard space.</li>
-<li>Look for removable, washable parts.</li>
+<li>Check the power (watts) - more power usually means faster results.</li>
+<li>Measure your counter and cupboard space.</li>
+<li>Look for removable parts that are easy to wash.</li>
 <li>Check the warranty shown on the product page.</li>
 </ul>
-<p>See our Kitchen Appliances section for ideas.</p>
+<p>See all our kitchen appliances in the Home &amp; Living section.</p>
 H],
 [
  'slug' => 'keep-insects-out-window-and-door-screens', 'cat' => 'home-living', 'image' => 'lebazone-blog-screens.jpg',
+ 'products' => ['Magnetic  Door Screen', 'Aluminum Window Insect Screen'],
  'title' => 'Keep insects out the easy way: window and door screens',
  'short' => 'Open windows, fresh air and no mosquitoes. How to choose and fit the right screen for every window and door.',
  'body' => <<<'H'
@@ -112,27 +116,30 @@ H],
 <p>Browse window insect screens and magnetic door screens in our Home &amp; Living section.</p>
 H],
 [
- 'slug' => 'ramadan-at-home-decorating-ideas', 'cat' => 'seasonal', 'image' => 'lebazone-blog-ramadan.jpg',
- 'title' => 'Ramadan at home: simple decorating ideas',
- 'short' => 'Lanterns, warm lights and a beautiful iftar table - easy ideas to bring the spirit of Ramadan into every room.',
+ 'slug' => 'grooming-at-home-trimmers-shavers-hair-tools', 'cat' => 'personal-care', 'image' => 'lebazone-blog-grooming.jpg',
+ 'products' => ['Hair&Beard Trimmer', 'Rechargeable Foil Shaver', 'Hair Dryer With Touch Sensor'],
+ 'title' => 'Grooming at home: trimmers, shavers and hair tools explained',
+ 'short' => 'Trimmer or shaver? Which hair dryer? A simple guide to the right tool for a clean look at home.',
  'body' => <<<'H'
-<p>Ramadan is a time for family, sharing and gathering around the table. A few simple touches make your home feel festive all month long.</p>
-<h2>1. Start with lanterns (fanous)</h2>
-<p>Lanterns are the heart of Ramadan decoration. Group two or three of different sizes on a side table, by the entrance or on a balcony. LED or battery lanterns are safe around children and curtains.</p>
-<h2>2. Add warm light</h2>
-<p>String lights along windows, shelves or a mirror give a soft glow at iftar and suhoor. Warm white feels cosy; gold and crescent shapes feel festive.</p>
-<h2>3. Dress the iftar table</h2>
+<p>A good set of grooming tools saves trips to the barber and keeps you looking sharp every day. Here is which tool does what.</p>
+<h2>Hair clipper</h2>
+<p>For cutting hair on the head. It comes with guide combs for different lengths - from a very short fade to a longer cut. Choose one with several combs and a strong motor that does not pull.</p>
+<h2>Hair &amp; beard trimmer</h2>
+<p>For shaping a beard, cleaning the neckline and keeping stubble at an exact length. Adjustable length settings are the key feature to look for.</p>
+<h2>Foil shaver</h2>
+<p>For a clean, close shave without a razor and foam. Rechargeable foil shavers are gentle on the skin and great for quick daily shaves.</p>
+<h2>Nose &amp; ear trimmer</h2>
+<p>A small, safe trimmer for the details - no pulling, no cuts.</p>
+<h2>Hair dryer and straightener</h2>
+<p>For drying, look at the power (watts) and heat settings - higher power dries faster, and a cool setting protects your hair. A compact travel dryer is handy for trips. A straightener with adjustable temperature lets you use less heat on fine hair.</p>
+<h2>Keep them working</h2>
 <ul>
-<li>A runner or tablecloth in gold, green or deep blue.</li>
-<li>Dates served in a nice bowl at the centre.</li>
-<li>Small candles or mini lanterns between the dishes.</li>
-<li>Serving trays that make passing food around easy for big gatherings.</li>
+<li>Brush hair out of the blades after every use.</li>
+<li>Oil clipper and trimmer blades every few weeks.</li>
+<li>Charge fully before the first use, and avoid leaving them charging for days.</li>
+<li>Keep tools that are not waterproof away from the shower.</li>
 </ul>
-<h2>4. A Ramadan corner for kids</h2>
-<p>Let children help: a small corner with their own lantern, a crescent decoration and a calendar to count the days to Eid keeps them excited and involved.</p>
-<h2>5. Keep it practical</h2>
-<p>Put decorations where they will not be knocked over during busy evenings, and choose pieces you can store and use again next year.</p>
-<p>Find lanterns, lights and table pieces in our Ramadan collection. Ramadan Kareem!</p>
+<p>Find trimmers, shavers, clippers and hair dryers in our Electronics &amp; Accessories section.</p>
 H],
 ],
 'faqs' => [
