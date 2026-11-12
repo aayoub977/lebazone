@@ -406,17 +406,25 @@ class ProductsApiController extends Controller
             }  elseif ($sort === 'discount') {
                 $query->orderByDesc(DB::raw("(SELECT MAX(IF(pvss.discounted_price > 0 AND pvss.price > 0, (pvss.price - pvss.discounted_price) / pvss.price, 0)) $pvssJoin)"));
             } elseif ($sort === 'popular') {
+                // Custom (Lebazone): pieces sold + wishlists (a new shop has few orders)
                 $query->orderByDesc(DB::raw('(
-                    SELECT COUNT(*)
-                    FROM order_items oi
-                    JOIN product_variants pv ON oi.product_variant_id = pv.id
-                    WHERE pv.product_id = products.id
+                    (SELECT COALESCE(SUM(oi.quantity), 0)
+                     FROM order_items oi
+                     JOIN product_variants pv ON oi.product_variant_id = pv.id
+                     WHERE pv.product_id = products.id)
+                    + (SELECT COUNT(*) FROM favorites f WHERE f.product_id = products.id)
                 )'));
             } elseif (!empty($fuzzyOrderIds)) {
                 // Closest spelling match first — plain "newest" would bury it.
                 $query->orderByRaw('FIELD(products.id,' . implode(',', $fuzzyOrderIds) . ')');
             } else {
                 $query->orderByDesc('id');
+            }
+            // Custom (Lebazone): products that tie (same price, no discount, never ordered)
+            // used to come out oldest-first in random-looking order, so "Popularity" and
+            // "Discount" looked like they did nothing. Ties now show the newest first.
+            if (in_array($sort, ['price_low', 'price_high', 'discount', 'popular'], true)) {
+                $query->orderByDesc('products.id');
             }
         }
 
