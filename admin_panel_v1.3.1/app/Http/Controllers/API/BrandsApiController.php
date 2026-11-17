@@ -82,6 +82,16 @@ class BrandsApiController extends Controller
             return CommonHelper::responseError('default_language_required');
         }
 
+        // Custom (Lebazone): a brand with this name already exists (e.g. a seller adding "Samsung"
+        // again) - use that one instead of making a duplicate
+        $existing = Brand::whereRaw('LOWER(TRIM(name)) = ?', [mb_strtolower(trim((string) $request->name))])->first();
+        if ($existing) {
+            return CommonHelper::responseWithData([
+                'id' => $existing->id,
+                'message' => 'This brand already exists - it is selected for you',
+            ]);
+        }
+
         $brand = new Brand();
         $brand->name = $request->name;
         $brand->status = 1;

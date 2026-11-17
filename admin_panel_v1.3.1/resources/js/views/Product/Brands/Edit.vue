@@ -25,7 +25,7 @@
             </div>
 
             <div v-if="lang.is_default">
-              <FileUpload v-model="image" :label="__('image')" required accept="image/*"
+              <FileUpload v-model="image" :label="__('image')" :required="!$can('seller_portal')" accept="image/*"
                 recommended-size="512x512px" :max-size-mb="2" :preview-url="image_url" />
             </div>
 
@@ -230,7 +230,8 @@ export default {
       }
 
       // Check image for new brands
-      if (!this.id && !this.image && !this.image_url) {
+      // Custom (Lebazone): sellers may add a brand without a logo
+      if (!this.id && !this.image && !this.image_url && !this.$can('seller_portal')) {
         this.showError(__('please_upload_brand_image') || __('please_upload_image'));
         this.switchToDefaultLanguageTab();
         return false;

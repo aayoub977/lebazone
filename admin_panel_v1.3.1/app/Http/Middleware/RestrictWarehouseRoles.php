@@ -23,10 +23,11 @@ class RestrictWarehouseRoles
     private const SELLER_FORM_GET = ['api/active_languages', 'api/attributes/dropdown', 'api/categories', 'api/categories/chain',
         'api/categories/main', 'api/categories/schema', 'api/countries', 'api/products/brands/get', 'api/products/check_sku',
         'api/products/tax_categories', 'api/products/tax_rules', 'api/products/tax_rules/*', 'api/products/variant_usage',
-        'api/stores/for_channel', 'api/products/edit/*', 'api/attributes', 'api/attributes/usage'];
+        'api/stores/for_channel', 'api/products/edit/*', 'api/attributes', 'api/attributes/usage', 'api/products/brands'];
     // save / update check inside ProductApisController that the product is the seller's own
     private const SELLER_FORM_POST = ['api/products/save', 'api/products/update', 'api/products/generate_description', 'api/products/generate_seo',
-        'api/attributes/save', 'api/attributes/update']; // their OWN attributes only (AttributeApiController checks)
+        'api/attributes/save', 'api/attributes/update', // their OWN attributes only (AttributeApiController checks)
+        'api/products/brands/save']; // new brands (an existing name is reused, never duplicated)
 
     public function handle(Request $request, Closure $next)
     {
