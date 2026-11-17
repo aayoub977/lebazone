@@ -48,7 +48,7 @@
                             </button>
                             <button type="button" class="btn btn-sm btn-outline-primary"
                                 v-if="$can('attribute_create')"
-                                :disabled="!effectiveCategoryId" @click="openAttributeModal(null)">
+                                :disabled="!effectiveCategoryId && !$can('seller_portal')" @click="openAttributeModal(null)">
                                 <Plus :size="15" /> {{ __('add_attribute') }}
                             </button>
                         </div>
@@ -67,8 +67,11 @@
                             </div>
                         </div>
                         <h6 v-if="showSellerCategory" class="lbz-cat-anchor text-uppercase small fw-bold mb-1">
-                            Lebazone category (main shop menu) <span class="text-danger">*</span></h6>
-                        <div v-if="showSellerCategory" class="small text-muted mb-2">Also required - pick the closest one; Lebazone can change it when approving.</div>
+                            Lebazone category (main shop menu)
+                            <span v-if="$can('seller_portal')" class="text-muted text-lowercase fw-normal">- optional</span>
+                            <span v-else class="text-danger">*</span></h6>
+                        <div v-if="$can('seller_portal')" class="small text-muted mb-2">You can skip this - Lebazone chooses where your product goes in the main shop menu when approving it.</div>
+                        <div v-else-if="showSellerCategory" class="small text-muted mb-2">The seller may have left this to you - choose where the product goes in the main shop menu.</div>
                         <div :class="{ 'lbz-cat-flash': lbzCatFlash }">
 
                         <div v-for="(lv, idx) in categoryLevels" :key="'lvl-' + idx" class="cat-level-block mb-3">
@@ -96,7 +99,7 @@
                         </div>
                         </div><!-- /lbz-cat-flash wrapper -->
 
-                        <div v-if="effectiveCategoryId" class="mt-4">
+                        <div v-if="effectiveCategoryId || $can('seller_portal')" class="mt-4">
                             <h6 class="mb-2">{{ __('attributes_from_category') }}</h6>
                             <p class="text-muted small mb-2">{{ __('attributes_will_be_used_to_build_variants') }}</p>
                             <div v-if="categoryAttributes.length === 0" class="text-muted small p-3 border rounded">
@@ -2925,6 +2928,13 @@ export default {
             if (step === 1) {
                 // Custom (Lebazone): with a seller's store category on top, say clearly that the
                 // Lebazone category below is ALSO needed (it puts the product in the main menu)
+                // sellers may leave the Lebazone category to Lebazone (chosen when approving)
+                if (this.$can('seller_portal')) {
+                    if (this.categoryAttributes.length === 0) {
+                        this.showError('Add at least one attribute for this product (e.g. Color) with "+ Add attribute".'); return false;
+                    }
+                    return true;
+                }
                 if (this.categoryLevels.length === 0 || !this.categoryLevels[0].selectedId) {
                     this.showError(this.showSellerCategory
                         ? 'Now also choose a Lebazone category (below your store category) - it puts your product in the main shop menu.'
@@ -3044,7 +3054,7 @@ export default {
         buildPayload(isDraft) {
             const fd = new FormData();
             if (this.id) fd.append('id', this.id);
-            fd.append('category_id', this.effectiveCategoryId);
+            fd.append('category_id', this.effectiveCategoryId || ''); // Custom (Lebazone): empty = Lebazone picks it (sellers)
             if (this.showSellerCategory) fd.append('seller_category_id', this.sellerCategoryId || ''); // Custom (Lebazone)
             fd.append('is_draft', isDraft ? 1 : 0);
             for (const [k, v] of Object.entries(this.basics)) fd.append(k, v ?? '');

@@ -303,6 +303,7 @@ Route::middleware(['auth:api', 'store.scope'])->group(function () {
         Route::post('review_product', [SellersApiController::class, 'reviewProduct']);
         Route::post('delete_pending', [SellersApiController::class, 'deletePending']);
         Route::get('preview_product', [SellersApiController::class, 'previewProduct']);
+        Route::get('leaf_categories', [SellersApiController::class, 'leafCategories']); // Custom (Lebazone)
     });
 
     // Custom (Hader): Aramex shipping

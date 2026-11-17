@@ -35,6 +35,7 @@
                                     <div class="fw-semibold text-truncate">{{ p.name }}</div>
                                     <div class="small text-muted">{{ money(p.sale_price != null ? p.sale_price : p.price) }} · {{ p.colors }} colour(s) · {{ p.stock }} pcs</div>
                                     <div class="small text-muted">{{ (p.created_at || '').slice(0, 10) }}</div>
+                                    <span v-if="p.needs_category" class="badge bg-warning text-dark mt-1">Needs a Lebazone category</span>
                                 </div>
                             </router-link>
                         </div>

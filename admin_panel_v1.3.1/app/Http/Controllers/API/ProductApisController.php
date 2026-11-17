@@ -509,6 +509,12 @@ class ProductApisController extends Controller
             return CommonHelper::responseError('Product not found');
         }
         if ($sid !== null) $request->merge(['status' => 0, 'is_draft' => 0]);
+        // Lebazone category is optional for sellers: keep the one already set, else the hidden
+        // "to sort" holding category - Lebazone picks the real one when approving.
+        if ($sid !== null && !$request->filled('category_id')) {
+            $existing = $request->filled('id') ? (int) DB::table('products')->where('id', (int) $request->input('id'))->value('category_id') : 0;
+            $request->merge(['category_id' => $existing ?: \App\Helpers\SellerScope::unsortedCategoryId()]);
+        }
 
         $res = $this->stepperSave($request);
         $data = $res instanceof \Illuminate\Http\JsonResponse ? $res->getData(true) : null;

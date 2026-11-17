@@ -15,6 +15,17 @@
         <div v-if="error" class="alert alert-warning">{{ error }}</div>
         <div v-else-if="!d" class="text-muted text-center py-5">Loading…</div>
         <template v-else>
+            <!-- Custom (Lebazone): the seller may leave the main-menu category to Lebazone -->
+            <div v-if="d.review === 'pending'" class="card mb-3" :class="d.needs_category ? 'border-warning' : ''"><div class="card-body py-2">
+                <div class="d-flex flex-wrap align-items-center gap-2">
+                    <b class="me-1">Lebazone category:</b>
+                    <span v-if="d.needs_category" class="badge bg-warning text-dark">Not chosen by the seller - choose it before approving</span>
+                    <select v-model="catId" class="form-select form-select-sm" style="max-width:420px">
+                        <option :value="null">{{ d.needs_category ? 'Choose a category…' : 'Keep: ' + (d.category || '—') }}</option>
+                        <option v-for="c in leafCats" :key="'lc' + c.id" :value="c.id">{{ c.path }}</option>
+                    </select>
+                </div>
+            </div></div>
             <div class="small text-muted mb-2">Preview - this is how customers will see it. <span v-if="d.seller">Added by <b>{{ d.seller.name }}</b> on {{ (d.created_at || '').slice(0, 10) }} · commission {{ d.seller.commission }}%</span></div>
             <div v-if="d.review === 'rejected' && d.review_note" class="alert alert-danger py-2 small">Rejected: {{ d.review_note }}</div>
 
@@ -87,7 +98,7 @@
 import axios from 'axios';
 
 export default {
-    data() { return { d: null, v: null, pic: '', busy: false, error: '' }; },
+    data() { return { d: null, v: null, pic: '', busy: false, error: '', catId: null, leafCats: [] }; },
     computed: {
         photos() {
             if (!this.v) return [];
@@ -117,6 +128,10 @@ export default {
                 this.d = r.data.data;
                 this.v = this.d.variants[0] || null;
                 this.pic = '';
+                this.catId = null;
+                if (this.d.review === 'pending' && !this.leafCats.length) {
+                    axios.get(this.$apiUrl + '/sellers/leaf_categories').then(c => { this.leafCats = (c.data && c.data.data) || []; }).catch(() => {});
+                }
             }).catch(e => { this.error = e?.response?.data?.message || e.message; });
         },
         pickVariant(x) { this.v = x; this.pic = ''; },
@@ -127,8 +142,12 @@ export default {
                 note = window.prompt('Why is "' + this.d.name + '" not approved? The seller will see this.', '');
                 if (note === null) return;
             }
+            if (decision === 'approve' && this.d.needs_category && !this.catId) {
+                return this.showError('Choose a Lebazone category first (the box at the top), then approve.');
+            }
             const fd = new FormData();
             fd.append('product_id', this.d.id); fd.append('decision', decision); fd.append('note', note);
+            if (decision === 'approve' && this.catId) fd.append('category_id', this.catId);
             this.busy = true;
             axios.post(this.$apiUrl + '/sellers/review_product', fd).then(r => {
                 if (r.data.status !== 1) return this.showError(r.data.message);

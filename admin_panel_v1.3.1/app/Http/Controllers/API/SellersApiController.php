@@ -151,13 +151,14 @@ class SellersApiController extends Controller
     public function pendingProducts()
     {
         $rows = Product::where('seller_review', 'pending')->with('translations')->orderBy('id')->limit(200)
-            ->get(['id', 'name', 'seller_id', 'seller_review', 'created_at'])
+            ->get(['id', 'name', 'seller_id', 'seller_review', 'created_at', 'category_id'])
             ->map(function ($p) {
                 $v = \App\Models\ProductVariant::where('product_id', $p->id)->orderBy('sort_order')->orderBy('id')->first();
                 $st = $v ? DB::table('product_variant_store_stocks')->where('product_variant_id', $v->id)->first() : null;
                 return ['id' => $p->id, 'name' => (string) $p->name, 'seller_id' => (int) $p->seller_id,
                     'seller' => (string) DB::table('sellers')->where('id', $p->seller_id)->value('business_name'),
                     'created_at' => (string) $p->created_at,
+                    'needs_category' => \App\Helpers\SellerScope::needsCategory((int) $p->category_id), // Custom (Lebazone)
                     'image' => $v && $v->image ? asset('storage/' . $v->image) : '',
                     'colors' => \App\Models\ProductVariant::where('product_id', $p->id)->count(),
                     'price' => $st ? (float) $st->price : null, 'sale_price' => $st ? (float) $st->discounted_price : null,
@@ -216,7 +217,9 @@ class SellersApiController extends Controller
             'name' => (string) ($tr->name ?? $p->name),
             'name_ar' => (string) ($arTr->name ?? ''),
             'description' => (string) ($tr->description ?? ''),
-            'category' => (string) ($p->category->name ?? ''),
+            'category' => \App\Helpers\SellerScope::needsCategory((int) $p->category_id) ? '' : (string) ($p->category->name ?? ''),
+            'category_id' => (int) $p->category_id,
+            'needs_category' => \App\Helpers\SellerScope::needsCategory((int) $p->category_id), // Custom (Lebazone)
             'brand' => (string) ($p->brand->name ?? ''),
             'size' => (string) ($p->lbz_size ?? ''),
             'status' => (int) $p->status,
@@ -234,6 +237,18 @@ class SellersApiController extends Controller
         $p = Product::find((int) $request->input('product_id'));
         if (!$p || !$p->seller_id) return CommonHelper::responseError('Product not found');
         if ($request->input('decision') === 'approve') {
+            // Custom (Lebazone): Lebazone chooses the main-menu category when the seller left it out
+            if ($request->filled('category_id')) {
+                $cid = (int) $request->input('category_id');
+                $valid = DB::table('categories')->where('id', $cid)->where('status', 1)->exists()
+                    && !DB::table('categories')->where('parent_id', $cid)->where('status', 1)->exists();
+                if (!$valid) return CommonHelper::responseError('Choose a final (lowest-level) Lebazone category');
+                DB::table('products')->where('id', $p->id)->update(['category_id' => $cid]);
+                $p->category_id = $cid;
+            }
+            if (\App\Helpers\SellerScope::needsCategory((int) $p->category_id)) {
+                return CommonHelper::responseError('Choose a Lebazone category for this product first');
+            }
             $active = Seller::where('id', $p->seller_id)->value('status') === 'active';
             DB::table('products')->where('id', $p->id)->update($active
                 ? ['status' => 1, 'seller_review' => null, 'seller_review_note' => null]
@@ -244,6 +259,23 @@ class SellersApiController extends Controller
         DB::table('products')->where('id', $p->id)->update(['status' => 0, 'seller_review' => 'rejected',
             'seller_review_note' => mb_substr(trim((string) $request->input('note')), 0, 250) ?: null]);
         return CommonHelper::responseSuccess('Rejected - the seller sees it in their account');
+    }
+
+    /** Custom (Lebazone): every final Lebazone category with its full path, for "approve + choose category". */
+    public function leafCategories()
+    {
+        $all = DB::table('categories')->where('status', 1)->where('slug', '!=', 'lbz-seller-unsorted')->get(['id', 'name', 'parent_id']);
+        $byId = $all->keyBy('id');
+        $parents = $all->pluck('parent_id')->filter()->flip();
+        $out = [];
+        foreach ($all as $c) {
+            if (isset($parents[$c->id])) continue; // has children - not a final category
+            $path = [$c->name]; $p = $c; $guard = 0;
+            while ($p->parent_id && isset($byId[$p->parent_id]) && $guard++ < 6) { $p = $byId[$p->parent_id]; array_unshift($path, $p->name); }
+            $out[] = ['id' => (int) $c->id, 'path' => implode(' › ', $path)];
+        }
+        usort($out, fn ($a, $b) => strcmp($a['path'], $b['path']));
+        return CommonHelper::responseWithData($out);
     }
 
     /** The logged-in seller's own page: balance, sales, payouts, products. */
