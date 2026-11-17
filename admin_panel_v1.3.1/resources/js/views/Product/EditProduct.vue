@@ -66,7 +66,10 @@
                                 <span v-if="!sellerCategories.length" class="text-muted small">No categories yet - add your first one.</span>
                             </div>
                         </div>
-                        <h6 v-if="showSellerCategory" class="text-uppercase small fw-bold mb-2">Lebazone category (main shop menu)</h6>
+                        <h6 v-if="showSellerCategory" class="lbz-cat-anchor text-uppercase small fw-bold mb-1">
+                            Lebazone category (main shop menu) <span class="text-danger">*</span></h6>
+                        <div v-if="showSellerCategory" class="small text-muted mb-2">Also required - pick the closest one; Lebazone can change it when approving.</div>
+                        <div :class="{ 'lbz-cat-flash': lbzCatFlash }">
 
                         <div v-for="(lv, idx) in categoryLevels" :key="'lvl-' + idx" class="cat-level-block mb-3">
                             <h6 class="cat-level-label text-uppercase mb-2">
@@ -91,6 +94,7 @@
                                 <span v-for="n in 6" :key="'catskel-' + n" class="skel cat-pill-skel"></span>
                             </div>
                         </div>
+                        </div><!-- /lbz-cat-flash wrapper -->
 
                         <div v-if="effectiveCategoryId" class="mt-4">
                             <h6 class="mb-2">{{ __('attributes_from_category') }}</h6>
@@ -1170,6 +1174,7 @@ export default {
         return {
             labelSize, // Custom (Lebazone): label size for "No barcode" items
             sellerCategories: [], sellerCategoryId: null, productSellerId: null, // Custom (Lebazone): seller's own categories
+            lbzCatFlash: false,
             czAllowAll: true, // store-wise inventory lists ALL countries' stores by default
             id: (this.$route?.params?.id && !this.$route?.params?.clone) ? Number(this.$route.params.id) : null,
             cloneSourceId: this.$route?.params?.clone ? Number(this.$route.params.id) : null,
@@ -1507,6 +1512,16 @@ export default {
         }
     },
     methods: {
+        // Custom (Lebazone): scroll to + highlight the Lebazone category rows
+        flashLebazoneCategory() {
+            this.lbzCatFlash = true;
+            this.$nextTick(() => {
+                const el = this.$el && this.$el.querySelector && this.$el.querySelector('.lbz-cat-anchor');
+                if (el && el.scrollIntoView) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            });
+            clearTimeout(this._lbzFlashT);
+            this._lbzFlashT = setTimeout(() => { this.lbzCatFlash = false; }, 2500);
+        },
         // Custom (Lebazone): the seller's own categories (for a seller login, or a seller's product)
         loadSellerCategories() {
             if (!this.showSellerCategory) return;
@@ -2908,11 +2923,21 @@ export default {
         },
         validateStep(step) {
             if (step === 1) {
+                // Custom (Lebazone): with a seller's store category on top, say clearly that the
+                // Lebazone category below is ALSO needed (it puts the product in the main menu)
                 if (this.categoryLevels.length === 0 || !this.categoryLevels[0].selectedId) {
-                    this.showError(__('please_select_parent_category')); return false;
+                    this.showError(this.showSellerCategory
+                        ? 'Now also choose a Lebazone category (below your store category) - it puts your product in the main shop menu.'
+                        : __('please_select_parent_category'));
+                    this.flashLebazoneCategory();
+                    return false;
                 }
                 if (this.hasUnselectedChildLevel) {
-                    this.showError(__('please_select_child_category')); return false;
+                    this.showError(this.showSellerCategory
+                        ? 'Choose the Lebazone sub-category too (the second row of the Lebazone category).'
+                        : __('please_select_child_category'));
+                    this.flashLebazoneCategory();
+                    return false;
                 }
                 if (this.categoryAttributes.length === 0) {
                     this.showError('Add at least one attribute for this product (e.g. Color) in the "Add an attribute to this product" box below.'); return false;
@@ -3647,4 +3672,6 @@ body.theme-dark .rv-tag-cod {
     font-size: 0.82rem;
     line-height: 1.35;
 }
+/* Custom (Lebazone): highlight the Lebazone category rows when they are still missing */
+.lbz-cat-flash { outline: 3px solid #DC2626; outline-offset: 6px; border-radius: 10px; transition: outline-color .3s; }
 </style>
