@@ -3068,8 +3068,14 @@ export default {
                 if (savedId && this.lbzWeight > 0) axios.post(this.$apiUrl + '/scan/set_weight', { product_id: savedId, weight_g: this.lbzWeight }).catch(() => {});
                 // Mark clean so the post-save redirect doesn't trip the unsaved-changes guard.
                 this.captureFormBaseline();
-                this.showMessage('success', __(successMessageKey));
-                this.$router.push({ path: '/products' });
+                // Custom (Lebazone): a seller goes back to "My shop" - the product waits for approval
+                if (this.$can('seller_portal')) {
+                    this.showMessage('success', 'Saved ✓ - Lebazone will check it and put it online after approval');
+                    this.$router.push({ path: '/seller' });
+                } else {
+                    this.showMessage('success', __(successMessageKey));
+                    this.$router.push({ path: '/products' });
+                }
             }).catch(err => {
                 const msg = err.response?.data?.message || err.message || __('something_went_wrong');
                 this.showError(msg);
@@ -3102,6 +3108,8 @@ export default {
             this.autoSaveDirty = true;
         },
         autoSaveTick() {
+            // Custom (Lebazone): no background drafts for sellers - each save goes to Lebazone for approval
+            if (this.$can('seller_portal')) return;
             if (this.isLoadingData || this.isLoading || this.autoSaveInFlight) return;
             if (!this.autoSaveDirty) return;
             if (!this.effectiveCategoryId) return;

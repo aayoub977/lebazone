@@ -7,7 +7,9 @@
                 <div class="small text-muted" v-if="loaded">Lebazone commission: {{ d.commission_percent }}% · you get the rest of each sale</div>
             </div>
             <router-link to="/scan/bulk" class="btn btn-outline-primary ms-auto">📄 Add many (Excel)</router-link>
-            <router-link to="/scan" class="btn btn-primary">+ Add a product</router-link>
+            <router-link to="/scan" class="btn btn-outline-primary">📷 Quick add (scan)</router-link>
+            <!-- Custom (Lebazone): the same full product form Lebazone uses -->
+            <router-link to="/products/create" class="btn btn-primary">+ Add a product</router-link>
         </div>
 
         <div v-if="error" class="alert alert-warning">{{ error }}</div>
@@ -23,7 +25,8 @@
             <div class="card mb-3"><div class="card-body">
                 <h5 class="mb-1">How it works</h5>
                 <ol class="small text-muted mb-0 ps-3">
-                    <li>Add each product with <b>+ Add a product</b> (photos, price, colours, how many pieces).</li>
+                    <li>Add each product with <b>+ Add a product</b> - the full form: name, description, photos, category, brand,
+                        colours / sizes, price and how many pieces. On the phone, <b>📷 Quick add</b> is faster.</li>
                     <li>Lebazone checks it - it appears on the shop once approved.</li>
                     <li>Bring the pieces to Lebazone; we count them in.</li>
                     <li>When an item is delivered and its return period is over, its price minus the commission is added to what Lebazone owes you.</li>
@@ -43,6 +46,8 @@
                         <div v-if="p.state === 'rejected' && p.note" class="small text-danger">Reason: {{ p.note }}</div>
                     </div>
                     <span class="badge" :class="badge(p.state)">{{ label(p.state) }}</span>
+                    <router-link :to="'/products/edit/' + p.id" class="btn btn-sm btn-outline-secondary ms-2"
+                        title="Changes go back to Lebazone for approval">✏️ Edit</router-link>
                 </div>
             </div></div>
 

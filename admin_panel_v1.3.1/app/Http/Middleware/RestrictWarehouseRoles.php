@@ -19,6 +19,14 @@ class RestrictWarehouseRoles
         'api/system_languages', 'api/store_settings', 'api/setup_guide', 'api/role', 'api/media', 'api/passkey/*'];
     private const SHELL_POST = ['api/update_fcm_token', 'api/logout', 'api/broadcasting/auth', 'api/system_users/change_password', 'api/change_language', 'api/passkey/*'];
 
+    /** Custom (Lebazone): what the full "Add / edit product" form reads, for seller logins. */
+    private const SELLER_FORM_GET = ['api/active_languages', 'api/attributes/dropdown', 'api/categories', 'api/categories/chain',
+        'api/categories/main', 'api/categories/schema', 'api/countries', 'api/products/brands/get', 'api/products/check_sku',
+        'api/products/tax_categories', 'api/products/tax_rules', 'api/products/tax_rules/*', 'api/products/variant_usage',
+        'api/stores/for_channel', 'api/products/edit/*'];
+    // save / update check inside ProductApisController that the product is the seller's own
+    private const SELLER_FORM_POST = ['api/products/save', 'api/products/update', 'api/products/generate_description', 'api/products/generate_seo'];
+
     public function handle(Request $request, Closure $next)
     {
         if (!$request->is('api/*') || !$request->bearerToken()) return $next($request);
@@ -43,13 +51,15 @@ class RestrictWarehouseRoles
                 || ($products && $request->is('api/scan/*'))
                 || ($station && $request->is('api/station/*'))
                 || ($seller && $request->is('api/seller_portal/*'))
+                || ($seller && $request->is(...self::SELLER_FORM_GET))
                 || $request->is('api/warehouse/me');
         } else {
             $ok = $request->is(...self::SHELL_POST)
                 || ($pack && $request->is('api/warehouse/scan', 'api/warehouse/pack', 'api/warehouse/reopen', 'api/warehouse/print'))
                 || ($station && $request->is('api/station/*', 'api/warehouse/print'))
                 || ($products && $request->is('api/scan/*'))
-                || ($seller && $request->is('api/seller_portal/*'));
+                || ($seller && $request->is('api/seller_portal/*'))
+                || ($seller && $request->is(...self::SELLER_FORM_POST));
         }
         if (!$ok) return response()->json(['status' => 0, 'message' => 'Not allowed for your account'], 403);
         return $next($request);

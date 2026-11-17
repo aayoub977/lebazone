@@ -472,14 +472,63 @@ class ProductApisController extends Controller
         return self::$noBarcodeCol ??= \Illuminate\Support\Facades\Schema::hasColumn('product_variants', 'lbz_no_barcode');
     }
 
+    /**
+     * Custom (Lebazone): the seller (consignment seller login) using this request, or null for
+     * Lebazone staff. -1 = a Seller login that isn't linked to a seller yet.
+     */
+    private function sellerIdForRequest(): ?int
+    {
+        $u = null;
+        try { $u = auth('api')->user(); } catch (\Throwable $e) {}
+        if (!$u || !$u->role || $u->role->name !== 'Seller') return null;
+        return (int) DB::table('sellers')->where('admin_id', $u->id)->value('id') ?: -1;
+    }
+
     public function save(Request $request)
     {
-        return $this->stepperSave($request);
+        return $this->sellerSave($request);
     }
 
     public function update(Request $request)
     {
-        return $this->stepperSave($request);
+        return $this->sellerSave($request);
+    }
+
+    /**
+     * Custom (Lebazone): sellers use the same full product form as the admin panel, but
+     *  - they can only open/change THEIR products,
+     *  - every product they add or change goes back to "waiting for approval" (hidden from the
+     *    shop) until Lebazone approves it on the Sellers page.
+     */
+    private function sellerSave(Request $request)
+    {
+        $sid = $this->sellerIdForRequest();
+        if ($sid === -1) return CommonHelper::responseError('Your login is not linked to a seller yet - ask Lebazone');
+        if ($sid !== null && $request->filled('id')
+            && (int) DB::table('products')->where('id', (int) $request->input('id'))->value('seller_id') !== $sid) {
+            return CommonHelper::responseError('Product not found');
+        }
+        if ($sid !== null) $request->merge(['status' => 0, 'is_draft' => 0]);
+
+        $res = $this->stepperSave($request);
+        if ($sid === null) return $res;
+
+        $data = $res instanceof \Illuminate\Http\JsonResponse ? $res->getData(true) : null;
+        $pid = (int) ($data['data']['id'] ?? 0);
+        if (($data['status'] ?? 0) == 1 && $pid) {
+            $upd = ['seller_id' => $sid, 'status' => 0];
+            if (\Illuminate\Support\Facades\Schema::hasColumn('products', 'seller_review')) { $upd['seller_review'] = 'pending'; $upd['seller_review_note'] = null; }
+            DB::table('products')->where('id', $pid)->update($upd);
+            try {
+                $sname = (string) DB::table('sellers')->where('id', $sid)->value('business_name');
+                $pname = (string) DB::table('products')->where('id', $pid)->value('name');
+                $what = $request->filled('id') ? 'changed' : 'added';
+                foreach (\App\Models\Admin::whereIn('role_id', [1, 2])->where('status', 1)->get() as $a) {
+                    $a->notify(new \App\Notifications\SellerProductAlert($pid, '🛍 ' . $sname . ' ' . $what . ' "' . $pname . '" - waiting for your approval (Sellers page)'));
+                }
+            } catch (\Throwable $e) { /* the notification is a nice-to-have */ }
+        }
+        return $res;
     }
 
     /**
@@ -979,6 +1028,11 @@ class ProductApisController extends Controller
      */
     public function edit($id)
     {
+        // Custom (Lebazone): a seller only opens their own products
+        $sid = $this->sellerIdForRequest();
+        if ($sid !== null && (int) DB::table('products')->where('id', (int) $id)->value('seller_id') !== $sid) {
+            return CommonHelper::responseError('Product not found');
+        }
         $product = Product::with([
             'category',
             'brand',
