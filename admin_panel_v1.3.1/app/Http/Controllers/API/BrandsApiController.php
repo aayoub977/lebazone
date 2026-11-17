@@ -97,7 +97,8 @@ class BrandsApiController extends Controller
         $brand->status = 1;
 
 
-        $brand->image = CommonHelper::uploadFile($request, 'image', 'brand');
+        // Custom (Lebazone): the logo is optional (sellers) - the column can't be empty-NULL
+        $brand->image = CommonHelper::uploadFile($request, 'image', 'brand') ?? '';
         $brand->save();
 
         $brand->saveTranslation($request->language_id, [
