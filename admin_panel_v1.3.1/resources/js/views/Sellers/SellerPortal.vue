@@ -35,6 +35,22 @@
 
             <SellerStoreEditor title="My store page" :about="d.store_about || ''" :banner="d.store_banner || ''" :url="d.store_url || ''" @saved="load" />
 
+            <!-- Custom (Lebazone): the seller's own categories (their store page) -->
+            <div class="card mb-3"><div class="card-body">
+                <h5 class="mb-1">My categories</h5>
+                <p class="small text-muted mb-2">Your own categories - customers see them on your store page. Pick one for each product in the product form.
+                    (Your own colours / sizes / materials: in the product form, <b>+ Add attribute</b>.)</p>
+                <div v-for="c in cats" :key="'c' + c.id" class="d-flex align-items-center gap-2 py-1 border-top">
+                    <span class="flex-grow-1">{{ c.name }} <small class="text-muted">· {{ c.products }} product{{ c.products === 1 ? '' : 's' }}</small></span>
+                    <button class="btn btn-sm btn-outline-secondary" @click="renameCat(c)">Rename</button>
+                    <button class="btn btn-sm btn-outline-danger" @click="deleteCat(c)">Delete</button>
+                </div>
+                <form class="d-flex gap-2 mt-2" @submit.prevent="addCat">
+                    <input v-model="newCat" class="form-control form-control-sm" placeholder="New category, e.g. Phone cases" maxlength="100">
+                    <button class="btn btn-sm btn-primary" :disabled="!newCat.trim()">Add</button>
+                </form>
+            </div></div>
+
             <div class="card mb-3"><div class="card-body">
                 <h5>My products</h5>
                 <div v-if="!d.products.length" class="text-muted small py-2">No products yet - tap <b>+ Add a product</b>.</div>
@@ -78,10 +94,28 @@ import SellerStoreEditor from '../../components/SellerStoreEditor.vue';
 export default {
     components: { SellerStoreEditor },
     data() {
-        return { d: { products: [], ledger: [], balance: 0 }, loaded: false, error: '' };
+        return { d: { products: [], ledger: [], balance: 0 }, loaded: false, error: '', cats: [], newCat: '' };
     },
-    created() { this.load(); },
+    created() { this.load(); this.loadCats(); },
     methods: {
+        loadCats() {
+            axios.get(this.$apiUrl + '/seller_portal/categories').then(r => { this.cats = (r.data && r.data.data) || []; }).catch(() => {});
+        },
+        saveCat(body) {
+            return axios.post(this.$apiUrl + '/seller_portal/categories/save', body).then(r => {
+                if (r.data.status !== 1) { this.$toast ? this.$toast.error(r.data.message) : window.alert(r.data.message); return; }
+                this.loadCats();
+            });
+        },
+        addCat() { const name = this.newCat.trim(); if (!name) return; this.saveCat({ name }).then(() => { this.newCat = ''; }); },
+        renameCat(c) {
+            const name = (window.prompt('New name', c.name) || '').trim();
+            if (name && name !== c.name) this.saveCat({ id: c.id, name });
+        },
+        deleteCat(c) {
+            if (!window.confirm('Delete "' + c.name + '"? Its products stay - they just lose this category.')) return;
+            axios.post(this.$apiUrl + '/seller_portal/categories/delete', { id: c.id }).then(() => this.loadCats());
+        },
         load() {
             axios.get(this.$apiUrl + '/seller_portal/summary').then(r => {
                 if (r.data.status !== 1) { this.error = r.data.message; return; }

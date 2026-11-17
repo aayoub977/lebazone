@@ -578,6 +578,9 @@ class CategoryApiController extends Controller
             }
         }
 
+        // Custom (Lebazone): sellers use their OWN attributes, not the ones Lebazone set on its categories
+        if (\App\Helpers\SellerScope::isSeller()) $attributes = collect();
+
         return CommonHelper::responseWithData([
             'parent_id' => $parentId,
             'attributes' => $attributes,

@@ -5,12 +5,16 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import * as api from "@/api/apiRoutes";
+import useUrlProductFilters from "@/hooks/useUrlProductFilters";
 
-type Store = { id: number; name: string; city: string; about: string; banner: string; products: number };
+type StoreCat = { id: number; name: string; products: number };
+type Store = { id: number; name: string; city: string; about: string; banner: string; products: number; categories?: StoreCat[] };
 
 export default function SellerStoreHeader() {
   const params = useSearchParams();
   const sellerId = params?.get("seller") || "";
+  const activeCat = params?.get("scat") || "";
+  const { setSellerCategoryId } = useUrlProductFilters() as any;
   const [store, setStore] = useState<Store | null>(null);
 
   useEffect(() => {
@@ -47,6 +51,28 @@ export default function SellerStoreHeader() {
         </div>
         {store.about && (
           <p className="px-4 pb-4 text-sm text-gray-700 dark:text-zinc-300 whitespace-pre-line">{store.about}</p>
+        )}
+        {/* Custom (Lebazone): the seller's own categories */}
+        {!!store.categories?.length && (
+          <div className="flex gap-2 overflow-x-auto px-4 pb-4" role="tablist" aria-label="Store categories">
+            {[{ id: 0, name: "All products", products: store.products }, ...store.categories].map((c) => {
+              const on = c.id === 0 ? !activeCat : String(c.id) === activeCat;
+              return (
+                <button
+                  key={c.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={on}
+                  onClick={() => setSellerCategoryId(c.id === 0 ? null : c.id)}
+                  className={`shrink-0 rounded-full border px-4 py-1.5 text-sm font-medium transition ${
+                    on ? "bg-red-600 border-red-600 text-white" : "cardBorder textColor hover:border-red-400"
+                  }`}
+                >
+                  {c.name} <span className={on ? "opacity-80" : "text-gray-500"}>({c.products})</span>
+                </button>
+              );
+            })}
+          </div>
         )}
       </div>
     </section>

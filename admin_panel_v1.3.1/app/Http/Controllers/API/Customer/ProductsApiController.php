@@ -134,6 +134,10 @@ class ProductsApiController extends Controller
         // Custom (Lebazone): a consignment seller's store page lists only their products
         if ($request->filled('seller_id') && \Illuminate\Support\Facades\Schema::hasColumn('products', 'seller_id')) {
             $query->where('seller_id', (int) $request->input('seller_id'));
+            // Custom (Lebazone): one of the seller's own categories (store page)
+            if ($request->filled('seller_category_id') && \Illuminate\Support\Facades\Schema::hasColumn('products', 'seller_category_id')) {
+                $query->where('seller_category_id', (int) $request->input('seller_category_id'));
+            }
         }
         // made_in is free text now (not a country id) — no country-id filter.
         if ($request->filled('slug')) {

@@ -91,6 +91,7 @@ export default function useUrlProductFilters() {
     setPriceFilter: (minMaxOrNull: any) => patchUrl({ price_filter: minMaxOrNull }),
     setSort: (v: any) => patchUrl({ sort_filter: v || null }),
     setSellerId: (id: any) => patchUrl({ seller_id: id || null }),
+    setSellerCategoryId: (id: any) => patchUrl({ seller_category_id: id || null }), // Custom (Lebazone)
     setCountryId: (id: any) => patchUrl({ country_id: id || null }),
     setMany: (patch: Record<string, any>) => patchUrl(patch),
     clearAll,

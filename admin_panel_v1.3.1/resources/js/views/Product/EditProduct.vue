@@ -53,6 +53,21 @@
                             </button>
                         </div>
 
+                        <!-- Custom (Lebazone): the seller's OWN category (their store page) -->
+                        <div v-if="showSellerCategory" class="cat-level-block mb-3 p-3 border rounded bg-light">
+                            <h6 class="cat-level-label text-uppercase mb-1">{{ $can('seller_portal') ? 'My store category' : 'Seller\'s store category' }}</h6>
+                            <div class="small text-muted mb-2">Shown on the seller's store page. The Lebazone category below puts the product in the main shop menu.</div>
+                            <div class="d-flex flex-wrap gap-2 align-items-center">
+                                <button v-for="c in sellerCategories" :key="'sc' + c.id" type="button" class="btn cat-pill"
+                                    :class="sellerCategoryId === c.id ? 'cat-pill-active' : ''"
+                                    @click="sellerCategoryId = (sellerCategoryId === c.id ? null : c.id)">{{ c.name }}</button>
+                                <button type="button" class="btn btn-sm btn-outline-success" @click="addSellerCategory">
+                                    <Plus :size="14" /> New category</button>
+                                <span v-if="!sellerCategories.length" class="text-muted small">No categories yet - add your first one.</span>
+                            </div>
+                        </div>
+                        <h6 v-if="showSellerCategory" class="text-uppercase small fw-bold mb-2">Lebazone category (main shop menu)</h6>
+
                         <div v-for="(lv, idx) in categoryLevels" :key="'lvl-' + idx" class="cat-level-block mb-3">
                             <h6 class="cat-level-label text-uppercase mb-2">
                                 {{ idx === 0 ? __('parent_category') : __('subcategory') }}
@@ -1154,6 +1169,7 @@ export default {
         try { labelSize = localStorage.getItem('lbzLabelSize') || '50x30'; } catch (e) {}
         return {
             labelSize, // Custom (Lebazone): label size for "No barcode" items
+            sellerCategories: [], sellerCategoryId: null, productSellerId: null, // Custom (Lebazone): seller's own categories
             czAllowAll: true, // store-wise inventory lists ALL countries' stores by default
             id: (this.$route?.params?.id && !this.$route?.params?.clone) ? Number(this.$route.params.id) : null,
             cloneSourceId: this.$route?.params?.clone ? Number(this.$route.params.id) : null,
@@ -1248,6 +1264,8 @@ export default {
         };
     },
     computed: {
+        // Custom (Lebazone): seller logins, and Lebazone staff editing a seller's product
+        showSellerCategory() { return this.$can('seller_portal') || !!this.productSellerId; },
         availableExtraAttrs() {
             const have = new Set((this.categoryAttributes || []).map(a => a.id));
             return (this.allAttributes || []).filter(a => !have.has(a.id));
@@ -1477,6 +1495,7 @@ export default {
     mounted() {
         this.$nextTick(() => this.bootstrap());
         this.loadAllAttributes(); // Custom (Lebazone): for "Add an attribute to this product"
+        this.loadSellerCategories(); // Custom (Lebazone): a seller's own categories
         if (!this.id) {
             this.autoSaveTimer = setInterval(() => this.autoSaveTick(), 20000);
         }
@@ -1488,6 +1507,26 @@ export default {
         }
     },
     methods: {
+        // Custom (Lebazone): the seller's own categories (for a seller login, or a seller's product)
+        loadSellerCategories() {
+            if (!this.showSellerCategory) return;
+            const params = this.$can('seller_portal') ? {} : { seller_id: this.productSellerId };
+            axios.get(this.$apiUrl + '/seller_portal/categories', { params }).then(r => {
+                this.sellerCategories = (r.data && r.data.data) || [];
+            }).catch(() => { });
+        },
+        addSellerCategory() {
+            const name = (window.prompt('Name of the new category (e.g. "Phone cases")') || '').trim();
+            if (!name) return;
+            const body = { name };
+            if (!this.$can('seller_portal')) body.seller_id = this.productSellerId;
+            axios.post(this.$apiUrl + '/seller_portal/categories/save', body).then(r => {
+                if (r.data.status !== 1) return this.showError(r.data.message);
+                const c = r.data.data;
+                this.sellerCategories.push({ id: c.id, name: c.name, products: 0 });
+                this.sellerCategoryId = c.id;
+            }).catch(e => this.showError(e.response?.data?.message || e.message));
+        },
         // Custom (Lebazone): Lebazone price labels for a colour with no barcode of its own
         printVariantLabels(v) {
             const sku = (v.sku || '').trim();
@@ -2136,6 +2175,10 @@ export default {
 
         applyProductData(d) {
             this.isDraft = !!d.is_draft;
+            // Custom (Lebazone): seller product - its category on the seller's store page
+            this.productSellerId = d.seller_id || null;
+            this.sellerCategoryId = d.seller_category_id || null;
+            this.loadSellerCategories();
             Object.assign(this.basics, {
                 brand_id: d.brand_id || 0,
                 tax_category_id: d.tax_category_id || null,
@@ -2769,7 +2812,8 @@ export default {
 
         loadAllAttributes(force = false) {
             if (this._allAttrReq && !force) return this._allAttrReq;
-            this._allAttrReq = axios.get(this.$apiUrl + '/attributes/dropdown').then(r => {
+            // Custom (Lebazone): include sellers' attributes (a seller's product uses the seller's own)
+            this._allAttrReq = axios.get(this.$apiUrl + '/attributes/dropdown', { params: { include_sellers: 1 } }).then(r => {
                 const rows = (r.data && r.data.data) || [];
                 this.allAttributes = Object.freeze(rows.map(a => {
                     const values = (a.values || a.active_values || []).map(v => Object.freeze({ ...v, translations: Object.freeze(v.translations || []) }));
@@ -2976,6 +3020,7 @@ export default {
             const fd = new FormData();
             if (this.id) fd.append('id', this.id);
             fd.append('category_id', this.effectiveCategoryId);
+            if (this.showSellerCategory) fd.append('seller_category_id', this.sellerCategoryId || ''); // Custom (Lebazone)
             fd.append('is_draft', isDraft ? 1 : 0);
             for (const [k, v] of Object.entries(this.basics)) fd.append(k, v ?? '');
 

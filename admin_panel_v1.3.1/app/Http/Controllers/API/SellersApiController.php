@@ -291,6 +291,15 @@ class SellersApiController extends Controller
             'about' => (string) ($s->store_about ?? ''),
             'banner' => $s->store_banner ? asset('storage/' . $s->store_banner) : '',
             'products' => (int) Product::where('seller_id', $s->id)->where('status', 1)->count(),
+            // Custom (Lebazone): the seller's own categories that have products on the shop
+            'categories' => \Illuminate\Support\Facades\Schema::hasTable('seller_categories')
+                ? \Illuminate\Support\Facades\DB::table('seller_categories as sc')
+                    ->join('products as p', 'p.seller_category_id', '=', 'sc.id')
+                    ->where('sc.seller_id', $s->id)->where('p.status', 1)->whereNull('p.deleted_at')
+                    ->groupBy('sc.id', 'sc.name', 'sc.sort_order')->orderBy('sc.sort_order')
+                    ->selectRaw('sc.id, sc.name, COUNT(p.id) as products')->get()
+                    ->map(fn ($r) => ['id' => (int) $r->id, 'name' => $r->name, 'products' => (int) $r->products])->values()
+                : [],
         ]);
     }
 

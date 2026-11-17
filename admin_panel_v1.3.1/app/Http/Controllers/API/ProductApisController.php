@@ -511,10 +511,19 @@ class ProductApisController extends Controller
         if ($sid !== null) $request->merge(['status' => 0, 'is_draft' => 0]);
 
         $res = $this->stepperSave($request);
-        if ($sid === null) return $res;
-
         $data = $res instanceof \Illuminate\Http\JsonResponse ? $res->getData(true) : null;
         $pid = (int) ($data['data']['id'] ?? 0);
+
+        // the product's category on the seller's own store page (must be one of that seller's)
+        if (($data['status'] ?? 0) == 1 && $pid && $request->has('seller_category_id')
+            && \Illuminate\Support\Facades\Schema::hasColumn('products', 'seller_category_id')) {
+            $owner = $sid ?? (int) DB::table('products')->where('id', $pid)->value('seller_id');
+            $sc = (int) $request->input('seller_category_id');
+            $ok = $sc && $owner && DB::table('seller_categories')->where('id', $sc)->where('seller_id', $owner)->exists();
+            DB::table('products')->where('id', $pid)->update(['seller_category_id' => $ok ? $sc : null]);
+        }
+        if ($sid === null) return $res;
+
         if (($data['status'] ?? 0) == 1 && $pid) {
             $upd = ['seller_id' => $sid, 'status' => 0];
             if (\Illuminate\Support\Facades\Schema::hasColumn('products', 'seller_review')) { $upd['seller_review'] = 'pending'; $upd['seller_review_note'] = null; }
@@ -1152,6 +1161,9 @@ class ProductApisController extends Controller
             ->unique(fn ($row) => $row['attribute_id'] . '-' . $row['value_id'])
             ->values();
         $payload['variants'] = $variantsOut;
+        // Custom (Lebazone): seller products - who sells it and its category on the seller's store page
+        $payload['seller_id'] = (int) ($product->seller_id ?? 0) ?: null;
+        $payload['seller_category_id'] = (int) ($product->seller_category_id ?? 0) ?: null;
         $payload['image_url'] = $product->image ? asset('storage/' . $product->image) : null;
 
         return CommonHelper::responseWithData($payload);

@@ -285,6 +285,10 @@ Route::middleware(['auth:api', 'store.scope'])->group(function () {
     // Custom (Lebazone): the logged-in seller's own page
     Route::get('seller_portal/summary', [SellersApiController::class, 'portal']);
     Route::post('seller_portal/store', [SellersApiController::class, 'saveStore']);
+    // Custom (Lebazone): a seller's own categories (their store page)
+    Route::get('seller_portal/categories', [\App\Http\Controllers\API\SellerCategoriesController::class, 'list']);
+    Route::post('seller_portal/categories/save', [\App\Http\Controllers\API\SellerCategoriesController::class, 'save']);
+    Route::post('seller_portal/categories/delete', [\App\Http\Controllers\API\SellerCategoriesController::class, 'delete']);
 
     // Custom (Hader): consignment sellers
     Route::group(['prefix' => 'sellers'], function () {

@@ -21,6 +21,35 @@ class AttributeApiController extends Controller
         $this->languageService = $languageService;
     }
 
+    // Custom (Lebazone): sellers have their own attributes. Lebazone staff work with Lebazone's
+    // (seller_id NULL); the product form for a seller's product can ask for all (include_sellers=1).
+    private function scopeAttributes($query, Request $request)
+    {
+        if (!\Illuminate\Support\Facades\Schema::hasColumn('attributes', 'seller_id')) return $query;
+        $sid = \App\Helpers\SellerScope::id();
+        if ($sid !== null) {
+            // their own attributes + any already used on their products (e.g. the Colour that
+            // the quick "scan" page uses), so their existing products still open correctly
+            return $query->where(function ($w) use ($sid) {
+                $w->where('seller_id', $sid)->orWhereIn('id', function ($q) use ($sid) {
+                    $q->select('pvav.attribute_id')->from('product_variant_attribute_values as pvav')
+                        ->join('product_variants as pv', 'pv.id', '=', 'pvav.product_variant_id')
+                        ->join('products as p', 'p.id', '=', 'pv.product_id')
+                        ->where('p.seller_id', $sid);
+                });
+            });
+        }
+        if ($request->boolean('include_sellers')) return $query;
+        return $query->whereNull('seller_id');
+    }
+
+    private function sellerOwns(int $attributeId): bool
+    {
+        $sid = \App\Helpers\SellerScope::id();
+        if ($sid === null || !\Illuminate\Support\Facades\Schema::hasColumn('attributes', 'seller_id')) return true;
+        return (int) DB::table('attributes')->where('id', $attributeId)->value('seller_id') === $sid;
+    }
+
     public function usage(Request $request)
     {
         $attributeId = (int) $request->input('id', $request->input('attribute_id', 0));
@@ -50,6 +79,7 @@ class AttributeApiController extends Controller
     public function list(Request $request)
     {
         if ($request->filled('id')) {
+            if (!$this->sellerOwns((int) $request->id)) return CommonHelper::responseError('attribute_not_found');
             $attribute = Attribute::withAllTranslations()
                 ->with(['values' => function ($q) {
                     $q->withAllTranslations();
@@ -70,6 +100,7 @@ class AttributeApiController extends Controller
                 $q->withAllTranslations();
             }])
             ->orderBy('id', 'DESC');
+        $this->scopeAttributes($query, $request);
 
         if ($filter) {
             $query->where(function ($q) use ($filter) {
@@ -95,6 +126,7 @@ class AttributeApiController extends Controller
                 $q->withAllTranslations();
             }])
             ->where('status', 1)
+            ->when(true, fn ($q) => $this->scopeAttributes($q, $request))
             ->orderBy('id')
             ->get();
 
@@ -138,6 +170,11 @@ class AttributeApiController extends Controller
                 'slug' => $slug,
                 'status' => $request->input('status', 1),
             ]);
+            // Custom (Lebazone): an attribute made by a seller belongs to that seller
+            $sid = \App\Helpers\SellerScope::id();
+            if ($sid !== null && \Illuminate\Support\Facades\Schema::hasColumn('attributes', 'seller_id')) {
+                DB::table('attributes')->where('id', $attribute->id)->update(['seller_id' => $sid]);
+            }
 
             $attribute->saveTranslation($request->language_id, ['name' => $request->name]);
 
@@ -155,6 +192,7 @@ class AttributeApiController extends Controller
         $defaultLanguage = $this->languageService->getDefaultLanguage();
         $isDefaultLang = $request->language_id == $defaultLanguage->id;
 
+        if (!$this->sellerOwns((int) $request->input('id'))) return CommonHelper::responseError('attribute_not_found');
         $rules = [
             'id' => 'required|exists:attributes,id',
             'language_id' => 'required|exists:languages,id',
@@ -236,7 +274,7 @@ class AttributeApiController extends Controller
     public function delete(Request $request)
     {
         $attribute = Attribute::find($request->id);
-        if (!$attribute) {
+        if (!$attribute || !$this->sellerOwns((int) $request->id)) {
             return CommonHelper::responseError('attribute_not_found');
         }
         // Block deleting an attribute that's used by any product variant.

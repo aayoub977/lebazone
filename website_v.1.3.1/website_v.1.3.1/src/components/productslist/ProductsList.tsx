@@ -399,6 +399,7 @@ const Products = ({ initialProducts = null }: ProductsListProps) => {
         .map((obj: any) => obj["unit_id"])
         .join(","),
       seller_id: filter?.seller_id,
+      seller_category_id: filter?.seller_category_id, // Custom (Lebazone)
       country_id: filter?.country_id,
       section_id: filter?.section_id,
       // Home-layout "See All" — param choice keys off data_source:

@@ -11,6 +11,7 @@ export const FILTER_PARAMS = {
   sort_filter: "sort",
   attribute_value_ids: "attr",
   seller_id: "seller",
+  seller_category_id: "scat", // Custom (Lebazone): a seller's own category
   country_id: "country",
 };
 
@@ -25,6 +26,7 @@ export const OWNED_QUERY_KEYS = [
   "sort",
   "attr",
   "seller",
+  "scat",
   "country",
 ];
 
@@ -57,6 +59,7 @@ export interface ParsedProductFilter {
   sort_filter: string;
   attribute_value_ids: number[];
   seller_id: string;
+  seller_category_id: string;
   country_id: string;
 }
 
@@ -69,6 +72,7 @@ export function parseFilterFromQuery(query: QueryObject = {}): ParsedProductFilt
   const sort_filter = toStr(query.sort) || "";
   const attribute_value_ids = parseCsvInts(query.attr);
   const seller_id = toStr(query.seller) || "";
+  const seller_category_id = toStr(query.scat) || "";
   const country_id = toStr(query.country) || "";
 
   const minRaw = toStr(query.price_min);
@@ -88,6 +92,7 @@ export function parseFilterFromQuery(query: QueryObject = {}): ParsedProductFilt
     sort_filter,
     attribute_value_ids,
     seller_id,
+    seller_category_id,
     country_id,
   };
 }
@@ -109,6 +114,7 @@ export interface ProductFilterPatch {
   sort_filter?: string | null;
   attribute_value_ids?: (number | string)[] | null;
   seller_id?: string | number | null;
+  seller_category_id?: string | number | null;
   country_id?: string | number | null;
   price_filter?: { min_price: number | string; max_price: number | string } | null;
 }
@@ -147,6 +153,7 @@ export function serializeFilterPatch(
     );
   }
   if ("seller_id" in patch) setOrDelete(FILTER_PARAMS.seller_id, patch.seller_id);
+  if ("seller_category_id" in patch) setOrDelete(FILTER_PARAMS.seller_category_id, patch.seller_category_id);
   if ("country_id" in patch)
     setOrDelete(FILTER_PARAMS.country_id, patch.country_id);
   if ("price_filter" in patch) {
@@ -196,6 +203,7 @@ export function buildFilterApiParams(
     sort: filter?.sort_filter,
     search: search !== undefined ? search : filter?.search,
     seller_id: filter?.seller_id,
+    seller_category_id: filter?.seller_category_id,
     country_id: filter?.country_id,
   };
   return params;
